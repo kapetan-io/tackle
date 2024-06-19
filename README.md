@@ -56,3 +56,12 @@ set.IsZero(value)
 // Returns true if 'value' is zero (the default golang value)
 set.IsZeroValue(reflect.ValueOf(value))
 ```
+
+## Random 
+Is a collection of functions which are useful in testing
+
+* random.Alpha() returns a random string of alpha characters
+* random.String() returns a random string of alpha and numeric characters
+* random.One() returns one of the strings randomly
+* random.Runes() returns a random string made up of characters passed
+* random.Duration() returns a random duration not exceeding the max duration provided
