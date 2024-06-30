@@ -30,6 +30,7 @@ func TestString(t *testing.T) {
 	}} {
 		t.Run(tc.msg, func(t *testing.T) {
 			res := random.String(tc.prefix, tc.length)
+			t.Logf("Random String: %s", res)
 			assert.Equal(t, tc.expectedLength, len(res))
 			assert.Contains(t, res, tc.prefix)
 			for _, ch := range res {
@@ -61,6 +62,7 @@ func TestAlpha(t *testing.T) {
 	}} {
 		t.Run(tc.msg, func(t *testing.T) {
 			res := random.Alpha(tc.prefix, tc.length)
+			t.Logf("Random Alpha: %s", res)
 			assert.Equal(t, tc.expectedLength, len(res))
 			assert.Contains(t, res, tc.prefix)
 			for _, ch := range res {

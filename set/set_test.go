@@ -1,5 +1,5 @@
 /*
-Copyright 2024 Kapetan.io Technologies
+Copyright 2024 Derrick J Wippler
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

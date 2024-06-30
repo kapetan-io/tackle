@@ -31,8 +31,8 @@ func Runes(prefix string, length int, runes ...string) string {
 	chars := strings.Join(runes, "")
 	var bytes = make([]byte, length)
 
-	for i, _ := range bytes {
-		bytes[i] = chars[rand.Intn(len(runes))]
+	for i := range bytes {
+		bytes[i] = chars[rand.Intn(len(chars))]
 	}
 	return prefix + string(bytes)
 }
