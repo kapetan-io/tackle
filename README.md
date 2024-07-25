@@ -65,3 +65,4 @@ Is a collection of functions which are useful in testing
 * random.One() returns one of the strings randomly
 * random.Runes() returns a random string made up of characters passed
 * random.Duration() returns a random duration not exceeding the max duration provided
+* random.Slice() returns a random item from the provided slice
