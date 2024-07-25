@@ -38,10 +38,16 @@ func Runes(prefix string, length int, runes ...string) string {
 }
 
 // Duration returns a random duration not exceeding the max duration provided
-func Duration(maxDuration time.Duration) time.Duration {
-	n := rand.Intn(int(maxDuration.Nanoseconds()))
-	if n == 0 {
-		return time.Duration(1)
+func Duration(min time.Duration, max time.Duration) time.Duration {
+	n := rand.Intn(int(max.Nanoseconds()))
+	if time.Duration(n) < min {
+		return min
 	}
 	return time.Duration(n)
+}
+
+// Slice return a random item from the provided slice
+func Slice[S ~[]E, E any](s S) E {
+	n := rand.Intn(len(s))
+	return s[n]
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/kapetan-io/tackle/random"
 	"github.com/stretchr/testify/assert"
+	"slices"
 	"testing"
 	"time"
 )
@@ -89,18 +90,54 @@ func TestItem(t *testing.T) {
 }
 
 func TestDuration(t *testing.T) {
-	d := random.Duration(time.Second)
+	d := random.Duration(time.Millisecond, time.Second)
 	t.Logf("duration: %s", d)
 	assert.True(t, d < time.Second)
+	assert.True(t, d > time.Millisecond)
 	assert.True(t, d.Nanoseconds() != 0)
 
-	d = random.Duration(time.Minute)
+	d = random.Duration(time.Second, time.Minute)
 	t.Logf("duration: %s", d)
 	assert.True(t, d < time.Minute)
+	assert.True(t, d > time.Second)
 	assert.True(t, d.Nanoseconds() != 0)
 
-	d = random.Duration(60 * time.Minute)
+	d = random.Duration(time.Minute, 60*time.Minute)
 	t.Logf("duration: %s", d)
 	assert.True(t, d < 60*time.Minute)
+	assert.True(t, d > time.Minute)
 	assert.True(t, d.Nanoseconds() != 0)
+}
+
+func TestSlice(t *testing.T) {
+	s := random.Slice([]string{"one", "two", "three"})
+	t.Logf("slice: %s", s)
+	assert.Equal(t, true, slices.Contains([]string{"one", "two", "three"}, s))
+
+	s = random.Slice([]string{"one", "two", "three"})
+	t.Logf("slice: %s", s)
+	assert.Equal(t, true, slices.Contains([]string{"one", "two", "three"}, s))
+
+	s = random.Slice([]string{"one", "two", "three"})
+	t.Logf("slice: %s", s)
+	assert.Equal(t, true, slices.Contains([]string{"one", "two", "three"}, s))
+
+	s = random.Slice([]string{"one", "two", "three"})
+	t.Logf("slice: %s", s)
+	assert.Equal(t, true, slices.Contains([]string{"one", "two", "three"}, s))
+}
+
+func TestSliceStruct(t *testing.T) {
+	type pair struct{ Key, Value string }
+	p := random.Slice([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}})
+	t.Logf("slice: %+v", p)
+	assert.Equal(t, true, slices.Contains([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}}, p))
+
+	p = random.Slice([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}})
+	t.Logf("slice: %+v", p)
+	assert.Equal(t, true, slices.Contains([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}}, p))
+
+	p = random.Slice([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}})
+	t.Logf("slice: %+v", p)
+	assert.Equal(t, true, slices.Contains([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}}, p))
 }
