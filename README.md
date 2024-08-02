@@ -82,7 +82,7 @@ Is intended as a drop in replacement for the golang standard time package. It al
 freeze, set and advance time during testing. 
 
 #### Thread Safety
-Freezing time presents a race condition when time is frozen. This is because the `clock.Freeze()` replaces a standard
+Freezing time presents a race condition when time is frozen. This is because `clock.Freeze()` replaces a standard
 time singleton private to the `clock` package with a frozen time singleton. If `clock.Freeze()` is called at the
 same time as it's being accessed in another go routine, a race condition occurs.
 
@@ -127,10 +127,10 @@ func main() {
         fired = true
     })
        
-    // Advance the clock 200ms into the future
-    clock.Advance(200*clock.Millisecond)
+    // Advance the clock 201ms into the future
+    clock.Advance(201*clock.Millisecond)
 
-	// Advance() forces all events, timers, tickers to fire that are scheduled for the
+    // Advance() forces all events, timers, tickers to fire that are scheduled for the
     // passed period of time.
     if fired {
         fmt.Println("We have arrived in the future!")
