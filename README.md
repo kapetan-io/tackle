@@ -137,3 +137,15 @@ func main() {
     }
 }
 ```
+
+## Mailgun History
+Several of the packages here are modified versions of libraries used successfully during my time at [Mailgun](https://github.com/mailgun).
+Some of the original packages can be found [here](https://github.com/mailgun/holster). 
+
+Tackle differs from Holster in one specific way, unlike Holster which became a dumping ground for often used libraries and useful 
+tools internal to Mailgun. Tackle is strictly for packages with no external dependencies other than the golang standard library. 
+Code from holster has been updated and un-necessary external dependencies removed. In some cases, functionality was removed to avoid
+an external dependency. 
+
+Tackle is intended as a place for small, but useful packages which any golang developer may find useful, without a needing a 
+dependency review.
