@@ -1,16 +1,23 @@
 # Tackle
-Kapetan's tackle box of libraries for golang.
+A tackle box of libraries for golang.
+
+All packages have ZERO external dependencies outside the standard golang library. The only exception is for tests
+which depend upon `github.com/stretchr/testify`.
 
 ## SET config values
 Simplify setting default values during configuration.
 ```go
+package main
+
 import "github.com/kapetan-io/tackle/set"
 
-var config struct {
+var Config struct {
     Bang float64
     Foo  string
     Bar  int
 }
+
+config := Config{}
 
 // Supply additional default values and set.Default() will
 // choose the first default that is not of zero value
@@ -20,25 +27,6 @@ set.Default(&config.Bar, 200)
 // Sets Bang to the environment variable "BANG" if set, else sets the
 // value to 5.0
 set.Default(&config.Bang, set.EnvNumber[float64]("BANG"), 5.0)
-
-// The following is equivalent to the above set.Default() calls
-// and demonstrates the complexity reduced by using set.Default()
-if config.Foo == "" {
-    config.Foo = os.Getenv("FOO")
-    if config.Foo == "" {
-        config.Foo = "default"
-    }
-}
-if config.Bar == 0 {
-    config.Bar = 200
-}
-if config.Bang == 0.0 {
-    v, _ := strconv.ParseFloat(os.Getenv("BANG"), 64)
-    config.Bang = float64(v)
-    if config.Bang == 0.0 {
-        config.Bang = 5.0
-    }
-}
 
 // Use set.Override() to assign the first value that is not empty or of zero
 // value. 
@@ -59,10 +47,93 @@ set.IsZeroValue(reflect.ValueOf(value))
 
 ## Random 
 Is a collection of functions which are useful in testing
+```go
+package main
 
-* random.Alpha() returns a random string of alpha characters
-* random.String() returns a random string of alpha and numeric characters
-* random.One() returns one of the strings randomly
-* random.Runes() returns a random string made up of characters passed
-* random.Duration() returns a random duration not exceeding the max duration provided
-* random.Slice() returns a random item from the provided slice
+import "github.com/kapetan-io/tackle/random"
+
+// Generates a random alpha/numeric string that starts with `prefix-`
+// and 10 random characters
+str := random.String("prefix-", 10)
+
+// Generates a random string of ONLY alpha characters that starts 
+// with `prefix-` and 10 random alpha characters
+alphaChars := random.Alpha("prefix-", 10)
+
+// One returns one of the strings randomly
+one := random.One("string1", "string2", "string3")
+
+// Runes returns a random string made up of characters passed. In this case, uses the
+// AlphaRunes and NumericRunes.
+str = random.Runes("prefix-", 10, random.AlphaRunes, random.NumericRunes)
+
+// Duration returns a random duration not exceeding the max duration provided
+d := random.Duration(time.Millisecond, time.Second)
+// Returns a random duration between 1 minute long and 60 minutes long.
+d = random.Duration(time.Minute, 60*time.Minute)
+
+// Slice return a random item from the provided slice
+type pair struct{ Key, Value string }
+p := random.Slice([]pair{{Key: "key1", Value: "value1"}, {Key: "key2", Value: "value2"}})
+```
+
+## Clock
+Is intended as a drop in replacement for the golang standard time package. It allows any package using `clock` to 
+freeze, set and advance time during testing. 
+
+#### Thread Safety
+Freezing time presents a race condition when time is frozen. This is because the `clock.Freeze()` replaces a standard
+time singleton private to the `clock` package with a frozen time singleton. If `clock.Freeze()` is called at the
+same time as it's being accessed in another go routine, a race condition occurs.
+
+Provided you only use `clock.Freeze()`  in tests -- which is how it is intended to be used -- you can provide a build 
+tag `-tags clock_mutex` which will build `clock` with a mutex that protects the singleton. You can safely omit the 
+build tag when building your application for production to avoid mutex contention.
+
+#### Scheduled Functions
+Scheduled functions are called from within the go routine which called `clock.Advanced()` unlike standard time package
+which calls them in their own goroutine.
+
+#### Performance
+We have successfully used clock in very high concurrency applications with no impact on performance. The only overhead
+introduced by `clock` is a single pointer deref and an inline method call to time.X(). All method calls to `Time`
+and `Duration` structs are not affected by `clock` only the package level functions.
+
+See
+* [Gubernator](https://github.com/gubernator-io/gubernator) A high performance rate limiting service
+* [Querator](https://github.com/kapetan.io/gubernator) An efficient reservation queue
+
+```go
+package main
+
+import (
+    "fmt"
+	"github.com/kapetan-io/tackle/clock"
+)
+
+func main() {
+    // Freeze freezes the current time
+    clock.Freeze(clock.Now())
+    // UnFreeze restores clock to current date/time.
+    defer clock.Unfreeze()
+
+    // You can also use a one-liner in tests
+    // defer clock.Freeze(clock.Now()).Unfreeze()
+
+    var fired bool
+
+    // Set a function to run in 100ms
+    clock.AfterFunc(100*clock.Millisecond, func() {
+        fired = true
+    })
+       
+    // Advance the clock 200ms into the future
+    clock.Advance(200*clock.Millisecond)
+
+	// Advance() forces all events, timers, tickers to fire that are scheduled for the
+    // passed period of time.
+    if fired {
+        fmt.Println("We have arrived in the future!")
+    }
+}
+```
