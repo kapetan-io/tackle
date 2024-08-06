@@ -1,15 +1,15 @@
-package clock
+package clock_test
 
 import (
 	"fmt"
+	"github.com/kapetan-io/tackle/clock"
+	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestFreezeUnfreeze(t *testing.T) {
-	Freeze(Now()).Unfreeze()
+	clock.Freeze(clock.Now()).Unfreeze()
 }
 
 type FrozenSuite struct {
@@ -28,82 +28,77 @@ func (s *FrozenSuite) SetupSuite() {
 }
 
 func (s *FrozenSuite) SetupTest() {
-	Freeze(s.epoch)
+	clock.Freeze(s.epoch)
 }
 
 func (s *FrozenSuite) TearDownTest() {
-	Unfreeze()
+	clock.Unfreeze()
 }
 
 func (s *FrozenSuite) TestAdvanceNow() {
-	s.Require().Equal(s.epoch, Now())
-	s.Require().Equal(42*time.Millisecond, Advance(42*time.Millisecond))
-	s.Require().Equal(s.epoch.Add(42*time.Millisecond), Now())
-	s.Require().Equal(55*time.Millisecond, Advance(13*time.Millisecond))
-	s.Require().Equal(74*time.Millisecond, Advance(19*time.Millisecond))
-	s.Require().Equal(s.epoch.Add(74*time.Millisecond), Now())
+	s.Require().Equal(s.epoch, clock.Now())
+	s.Require().Equal(42*time.Millisecond, clock.Advance(42*time.Millisecond))
+	s.Require().Equal(s.epoch.Add(42*time.Millisecond), clock.Now())
+	s.Require().Equal(55*time.Millisecond, clock.Advance(13*time.Millisecond))
+	s.Require().Equal(74*time.Millisecond, clock.Advance(19*time.Millisecond))
+	s.Require().Equal(s.epoch.Add(74*time.Millisecond), clock.Now())
 }
 
 func (s *FrozenSuite) TestSleep() {
-	s.T().Skip("TODO: fix DATA RACE and enable(https://github.com/mailgun/holster/issues/147)")
-
 	hits := make(chan int, 100)
 
 	delays := []int{60, 100, 90, 131, 999, 5}
 	for i, tc := range []struct {
-		desc string
+		Name string
 		fn   func(delayMs int)
 	}{{
-		desc: "Sleep",
+		Name: "Sleep",
 		fn: func(delay int) {
-			Sleep(time.Duration(delay) * time.Millisecond)
+			clock.Sleep(time.Duration(delay) * time.Millisecond)
 			hits <- delay
 		},
 	}, {
-		desc: "After",
+		Name: "After",
 		fn: func(delay int) {
-			<-After(time.Duration(delay) * time.Millisecond)
+			<-clock.After(time.Duration(delay) * time.Millisecond)
 			hits <- delay
 		},
 	}, {
-		desc: "AfterFunc",
+		Name: "AfterFunc",
 		fn: func(delay int) {
-			AfterFunc(time.Duration(delay)*time.Millisecond,
+			clock.AfterFunc(time.Duration(delay)*time.Millisecond,
 				func() {
 					hits <- delay
 				})
 		},
 	}, {
-		desc: "NewTimer",
+		Name: "NewTimer",
 		fn: func(delay int) {
-			t := NewTimer(time.Duration(delay) * time.Millisecond)
+			t := clock.NewTimer(time.Duration(delay) * time.Millisecond)
 			<-t.C()
 			hits <- delay
 		},
 	}} {
-		fmt.Printf("Test case #%d: %s", i, tc.desc)
+		fmt.Printf("Test case #%d: %s", i, tc.Name)
 		for _, delay := range delays {
-			go tc.fn(delay)
+			go func(delay int) {
+				tc.fn(delay)
+			}(delay)
 		}
-		// Spin-wait for all goroutines to fall asleep.
-		ft := provider.(*frozenTime)
-		for {
-			if len(ft.timers) == len(delays) {
-				break
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
+
+		// Wait for all go routines to register their scheduled timers
+		clock.Wait4Scheduled(len(delays), time.Second)
 
 		runningMs := 0
 		for i, delayMs := range []int{5, 60, 90, 100, 131, 999} {
 			fmt.Printf("Checking timer #%d, delay=%d\n", i, delayMs)
 			delta := delayMs - runningMs - 1
-			Advance(time.Duration(delta) * time.Millisecond)
+			clock.Advance(time.Duration(delta) * time.Millisecond)
 			// Check before each timer deadline that it is not triggered yet.
 			s.assertHits(hits, []int{})
 
 			// When
-			Advance(1 * time.Millisecond)
+			clock.Advance(1 * time.Millisecond)
 
 			// Then
 			s.assertHits(hits, []int{delayMs})
@@ -111,7 +106,7 @@ func (s *FrozenSuite) TestSleep() {
 			runningMs += delta + 1
 		}
 
-		Advance(1000 * time.Millisecond)
+		clock.Advance(1000 * time.Millisecond)
 		s.assertHits(hits, []int{})
 	}
 }
@@ -121,28 +116,28 @@ func (s *FrozenSuite) TestSleep() {
 func (s *FrozenSuite) TestSameTime() {
 	var hits []int
 
-	AfterFunc(100, func() { hits = append(hits, 3) })
-	AfterFunc(100, func() { hits = append(hits, 1) })
-	AfterFunc(99, func() { hits = append(hits, 2) })
-	AfterFunc(100, func() { hits = append(hits, 5) })
-	AfterFunc(101, func() { hits = append(hits, 4) })
-	AfterFunc(101, func() { hits = append(hits, 6) })
+	clock.AfterFunc(100, func() { hits = append(hits, 3) })
+	clock.AfterFunc(100, func() { hits = append(hits, 1) })
+	clock.AfterFunc(99, func() { hits = append(hits, 2) })
+	clock.AfterFunc(100, func() { hits = append(hits, 5) })
+	clock.AfterFunc(101, func() { hits = append(hits, 4) })
+	clock.AfterFunc(101, func() { hits = append(hits, 6) })
 
 	// When
-	Advance(100)
+	clock.Advance(100)
 
 	// Then
 	s.Require().Equal([]int{2, 3, 1, 5}, hits)
 }
 
 func (s *FrozenSuite) TestTimerStop() {
-	hits := []int{}
+	var hits []int
 
-	AfterFunc(100, func() { hits = append(hits, 1) })
-	t := AfterFunc(100, func() { hits = append(hits, 2) })
-	AfterFunc(100, func() { hits = append(hits, 3) })
-	Advance(99)
-	s.Require().Equal([]int{}, hits)
+	clock.AfterFunc(100, func() { hits = append(hits, 1) })
+	t := clock.AfterFunc(100, func() { hits = append(hits, 2) })
+	clock.AfterFunc(100, func() { hits = append(hits, 3) })
+	clock.Advance(99)
+	s.Require().Equal(0, len(hits))
 
 	// When
 	active1 := t.Stop()
@@ -151,18 +146,18 @@ func (s *FrozenSuite) TestTimerStop() {
 	// Then
 	s.Require().Equal(true, active1)
 	s.Require().Equal(false, active2)
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal([]int{1, 3}, hits)
 }
 
 func (s *FrozenSuite) TestReset() {
-	hits := []int{}
+	var hits []int
 
-	t1 := AfterFunc(100, func() { hits = append(hits, 1) })
-	t2 := AfterFunc(100, func() { hits = append(hits, 2) })
-	AfterFunc(100, func() { hits = append(hits, 3) })
-	Advance(99)
-	s.Require().Equal([]int{}, hits)
+	t1 := clock.AfterFunc(100, func() { hits = append(hits, 1) })
+	t2 := clock.AfterFunc(100, func() { hits = append(hits, 2) })
+	clock.AfterFunc(100, func() { hits = append(hits, 3) })
+	clock.Advance(99)
+	s.Require().Equal(0, len(hits))
 
 	// When
 	active1 := t1.Reset(1) // Reset to the same time
@@ -172,24 +167,24 @@ func (s *FrozenSuite) TestReset() {
 	s.Require().Equal(true, active1)
 	s.Require().Equal(true, active2)
 
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal([]int{3, 1}, hits)
-	Advance(5)
+	clock.Advance(5)
 	s.Require().Equal([]int{3, 1}, hits)
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal([]int{3, 1, 2}, hits)
 }
 
 // Reset to the same time just puts the timer at the end of the trigger list
 // for the date.
 func (s *FrozenSuite) TestResetSame() {
-	hits := []int{}
+	var hits []int
 
-	t := AfterFunc(100, func() { hits = append(hits, 1) })
-	AfterFunc(100, func() { hits = append(hits, 2) })
-	AfterFunc(100, func() { hits = append(hits, 3) })
-	AfterFunc(101, func() { hits = append(hits, 4) })
-	Advance(9)
+	t := clock.AfterFunc(100, func() { hits = append(hits, 1) })
+	clock.AfterFunc(100, func() { hits = append(hits, 2) })
+	clock.AfterFunc(100, func() { hits = append(hits, 3) })
+	clock.AfterFunc(101, func() { hits = append(hits, 4) })
+	clock.Advance(9)
 
 	// When
 	active := t.Reset(91)
@@ -197,28 +192,28 @@ func (s *FrozenSuite) TestResetSame() {
 	// Then
 	s.Require().Equal(true, active)
 
-	Advance(90)
-	s.Require().Equal([]int{}, hits)
-	Advance(1)
+	clock.Advance(90)
+	s.Require().Equal(0, len(hits))
+	clock.Advance(1)
 	s.Require().Equal([]int{2, 3, 1}, hits)
 }
 
 func (s *FrozenSuite) TestTicker() {
-	t := NewTicker(100)
+	t := clock.NewTicker(100)
 
-	Advance(99)
+	clock.Advance(99)
 	s.assertNotFired(t.C())
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal(<-t.C(), s.epoch.Add(100))
-	Advance(750)
+	clock.Advance(750)
 	s.Require().Equal(<-t.C(), s.epoch.Add(200))
-	Advance(49)
+	clock.Advance(49)
 	s.assertNotFired(t.C())
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal(<-t.C(), s.epoch.Add(900))
 
 	t.Stop()
-	Advance(300)
+	clock.Advance(300)
 	s.assertNotFired(t.C())
 }
 
@@ -227,32 +222,32 @@ func (s *FrozenSuite) TestTickerZero() {
 		_ = recover()
 	}()
 
-	NewTicker(0)
+	clock.NewTicker(0)
 	s.Fail("Should panic")
 }
 
 func (s *FrozenSuite) TestTick() {
-	ch := Tick(100)
+	ch := clock.Tick(100)
 
-	Advance(99)
+	clock.Advance(99)
 	s.assertNotFired(ch)
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal(<-ch, s.epoch.Add(100))
-	Advance(750)
+	clock.Advance(750)
 	s.Require().Equal(<-ch, s.epoch.Add(200))
-	Advance(49)
+	clock.Advance(49)
 	s.assertNotFired(ch)
-	Advance(1)
+	clock.Advance(1)
 	s.Require().Equal(<-ch, s.epoch.Add(900))
 }
 
 func (s *FrozenSuite) TestTickZero() {
-	ch := Tick(0)
+	ch := clock.Tick(0)
 	s.Require().Nil(ch)
 }
 
 func (s *FrozenSuite) TestNewStoppedTimer() {
-	t := NewStoppedTimer()
+	t := clock.NewStoppedTimer()
 
 	// When/Then
 	select {
@@ -264,22 +259,22 @@ func (s *FrozenSuite) TestNewStoppedTimer() {
 }
 
 func (s *FrozenSuite) TestWait4Scheduled() {
-	After(100 * Millisecond)
-	After(100 * Millisecond)
-	s.Require().Equal(false, Wait4Scheduled(3, 0))
+	clock.After(100 * clock.Millisecond)
+	clock.After(100 * clock.Millisecond)
+	s.Require().Equal(false, clock.Wait4Scheduled(3, 0))
 
 	startedCh := make(chan struct{})
 	resultCh := make(chan bool)
 	go func() {
 		close(startedCh)
-		resultCh <- Wait4Scheduled(3, 5*Second)
+		resultCh <- clock.Wait4Scheduled(3, 5*clock.Second)
 	}()
 	// Allow some time for waiter to be set and start waiting for a signal.
 	<-startedCh
-	time.Sleep(50 * Millisecond)
+	time.Sleep(50 * clock.Millisecond)
 
 	// When
-	After(100 * Millisecond)
+	clock.After(100 * clock.Millisecond)
 
 	// Then
 	s.Require().Equal(true, <-resultCh)
@@ -288,22 +283,22 @@ func (s *FrozenSuite) TestWait4Scheduled() {
 // If there is enough timers scheduled already, then a shortcut execution path
 // is taken and Wait4Scheduled returns immediately.
 func (s *FrozenSuite) TestWait4ScheduledImmediate() {
-	After(100 * Millisecond)
-	After(100 * Millisecond)
+	clock.After(100 * clock.Millisecond)
+	clock.After(100 * clock.Millisecond)
 	// When/Then
-	s.Require().Equal(true, Wait4Scheduled(2, 0))
+	s.Require().Equal(true, clock.Wait4Scheduled(2, 0))
 }
 
 func (s *FrozenSuite) TestSince() {
-	s.Require().Equal(Duration(0), Since(Now()))
-	s.Require().Equal(-Millisecond, Since(Now().Add(Millisecond)))
-	s.Require().Equal(Millisecond, Since(Now().Add(-Millisecond)))
+	s.Require().Equal(clock.Duration(0), clock.Since(clock.Now()))
+	s.Require().Equal(-clock.Millisecond, clock.Since(clock.Now().Add(clock.Millisecond)))
+	s.Require().Equal(clock.Millisecond, clock.Since(clock.Now().Add(-clock.Millisecond)))
 }
 
 func (s *FrozenSuite) TestUntil() {
-	s.Require().Equal(Duration(0), Until(Now()))
-	s.Require().Equal(Millisecond, Until(Now().Add(Millisecond)))
-	s.Require().Equal(-Millisecond, Until(Now().Add(-Millisecond)))
+	s.Require().Equal(clock.Duration(0), clock.Until(clock.Now()))
+	s.Require().Equal(clock.Millisecond, clock.Until(clock.Now().Add(clock.Millisecond)))
+	s.Require().Equal(-clock.Millisecond, clock.Until(clock.Now().Add(-clock.Millisecond)))
 }
 
 func (s *FrozenSuite) assertHits(got <-chan int, want []int) {

@@ -120,9 +120,8 @@ func main() {
     // You can also use a one-liner in tests
     // defer clock.Freeze(clock.Now()).Unfreeze()
 
-    var fired bool
-
     // Set a function to run in 100ms
+	var fired bool
     clock.AfterFunc(100*clock.Millisecond, func() {
         fired = true
     })
@@ -135,6 +134,16 @@ func main() {
     if fired {
         fmt.Println("We have arrived in the future!")
     }
+
+    // Create an isolated clock provider for localised time control
+	p1 := clock.NewProvider()
+	p1.Freeze(clock.Now())
+
+	// Advance the provider by 10 seconds.
+	p1.Advance(10 * clock.Second)
+    future := p1.Now().UTC()
+    now := clock.Now().UTC()
+    fmt.Printf("%s is ten seconds ahead of %s\n", future, now)
 }
 ```
 

@@ -21,3 +21,20 @@ func getProvider() Clock {
 	providerMu.RUnlock()
 	return p
 }
+
+type Provider struct {
+	mutex    sync.RWMutex
+	provider Clock
+}
+
+func (p *Provider) setProvider(c Clock) {
+	defer p.mutex.Unlock()
+	p.mutex.Lock()
+	p.provider = c
+}
+
+func (p *Provider) getProvider() Clock {
+	defer p.mutex.RUnlock()
+	p.mutex.RLock()
+	return p.provider
+}

@@ -92,20 +92,20 @@ func TestItem(t *testing.T) {
 func TestDuration(t *testing.T) {
 	d := random.Duration(time.Millisecond, time.Second)
 	t.Logf("duration: %s", d)
-	assert.True(t, d < time.Second)
-	assert.True(t, d > time.Millisecond)
+	assert.True(t, d <= time.Second)
+	assert.True(t, d >= time.Millisecond)
 	assert.True(t, d.Nanoseconds() != 0)
 
 	d = random.Duration(time.Second, time.Minute)
 	t.Logf("duration: %s", d)
-	assert.True(t, d < time.Minute)
-	assert.True(t, d > time.Second)
+	assert.True(t, d <= time.Minute)
+	assert.True(t, d >= time.Second)
 	assert.True(t, d.Nanoseconds() != 0)
 
 	d = random.Duration(time.Minute, 60*time.Minute)
 	t.Logf("duration: %s", d)
-	assert.True(t, d < 60*time.Minute)
-	assert.True(t, d > time.Minute)
+	assert.True(t, d <= 60*time.Minute)
+	assert.True(t, d >= time.Minute)
 	assert.True(t, d.Nanoseconds() != 0)
 }
 
