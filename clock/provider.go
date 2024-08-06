@@ -14,7 +14,7 @@ func (cp *Provider) Freeze(now time.Time) {
 	cp.setProvider(&frozenTime{frozenAt: now, now: now})
 }
 
-// UnFreeze "unfreezes" time
+// UnFreeze is the opposite of Freeze() returning the provider the current time.
 func (cp *Provider) UnFreeze() {
 	cp.setProvider(realtime)
 }

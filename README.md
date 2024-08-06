@@ -138,6 +138,7 @@ func main() {
     // Create an isolated clock provider for localised time control
 	p1 := clock.NewProvider()
 	p1.Freeze(clock.Now())
+    defer p1.Unfreeze()
 
 	// Advance the provider by 10 seconds.
 	p1.Advance(10 * clock.Second)

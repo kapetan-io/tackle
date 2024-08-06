@@ -9,7 +9,7 @@ import (
 )
 
 func TestFreezeUnfreeze(t *testing.T) {
-	clock.Freeze(clock.Now()).Unfreeze()
+	clock.Freeze(clock.Now()).UnFreeze()
 }
 
 type FrozenSuite struct {
@@ -32,7 +32,7 @@ func (s *FrozenSuite) SetupTest() {
 }
 
 func (s *FrozenSuite) TearDownTest() {
-	clock.Unfreeze()
+	clock.UnFreeze()
 }
 
 func (s *FrozenSuite) TestAdvanceNow() {
