@@ -9,6 +9,7 @@ import (
 func TestNewProvider(t *testing.T) {
 	// Create a new provider and freeze time.
 	p1 := clock.NewProvider()
+	t.Logf("Current Time: %s", p1.Now().UTC())
 	now := clock.Now()
 	p1.Freeze(now)
 

@@ -6,7 +6,9 @@ import "time"
 // This allows some packages or instances to manipulate time without affecting the global clock, enabling other
 // packages with separate provider instances to maintain their own distinct timelines.
 func NewProvider() *Provider {
-	return &Provider{}
+	p := &Provider{}
+	p.setProvider(realtime)
+	return p
 }
 
 // Freeze "freezes" time
