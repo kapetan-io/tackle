@@ -115,13 +115,13 @@ func main() {
     // Freeze freezes the current time
     clock.Freeze(clock.Now())
     // UnFreeze restores clock to current date/time.
-    defer clock.Unfreeze()
+    defer clock.UnFreeze()
 
     // You can also use a one-liner in tests
-    // defer clock.Freeze(clock.Now()).Unfreeze()
+    // defer clock.Freeze(clock.Now()).UnFreeze()
 
     // Set a function to run in 100ms
-	var fired bool
+    var fired bool
     clock.AfterFunc(100*clock.Millisecond, func() {
         fired = true
     })
@@ -136,12 +136,12 @@ func main() {
     }
 
     // Create an isolated clock provider for localised time control
-	p1 := clock.NewProvider()
-	p1.Freeze(clock.Now())
-    defer p1.Unfreeze()
+    p1 := clock.NewProvider()
+    p1.Freeze(clock.Now())
+    defer p1.UnFreeze()
 
 	// Advance the provider by 10 seconds.
-	p1.Advance(10 * clock.Second)
+    p1.Advance(10 * clock.Second)
     future := p1.Now().UTC()
     now := clock.Now().UTC()
     fmt.Printf("%s is ten seconds ahead of %s\n", future, now)

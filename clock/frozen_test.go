@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestFreezeUnfreeze(t *testing.T) {
+func TestFreezeUnFreeze(t *testing.T) {
 	clock.Freeze(clock.Now()).UnFreeze()
 }
 
