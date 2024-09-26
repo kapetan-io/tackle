@@ -148,6 +148,51 @@ func main() {
 }
 ```
 
+## Color
+Is intended as a drop in replacement for `slog.NewTextHandler()` when developing locally or running tests. The 
+colorized output of log messages can make spotting errors in walls of text much easier.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/kapetan-io/tackle/color"
+    "log/slog"
+)
+
+func main() {
+    fmt.Printf("\n--- Default Options ---\n")
+    log := slog.New(color.NewLog(nil))
+    
+    log.Debug("This is a debug", "attr1", 2319, "attr2", "foo")
+    log.Info("This is a info", "attr1", 2319, "attr2", "foo")
+    log.Warn("This is a warning", "attr1", 2319, "attr2", "foo")
+    log.Error("This is an error", "attr1", 2319, "attr2", "foo")
+    log.Log(context.Background(), slog.LevelError+1, "This is a error+1")
+    log.Log(context.Background(), slog.LevelError+2, "This is a error+2")
+
+    log = slog.New(color.NewLog(&color.LogOptions{MsgColor: color.FgHiWhite}))
+    log.Info("This is color.FgHiWhite message", "attr1", 2319, "attr2", "foo")
+    log = slog.New(color.NewLog(&color.LogOptions{MsgColor: color.FgHiBlue}))
+    log.Info("This is color.FgHiBlue message", "attr1", 2319, "attr2", "foo")
+
+    fmt.Printf("\n--- color.SupressAttrs(slog.TimeKey) ---\n")
+    log = slog.New(color.NewLog(&color.LogOptions{
+        HandlerOptions: slog.HandlerOptions{
+        ReplaceAttr: color.SuppressAttrs(slog.TimeKey),
+    }}))
+   
+    log.Debug("This is a debug", "attr1", 2319, "attr2", "foo")
+    log.Info("This is a info", "attr1", 2319, "attr2", "foo")
+    log.Warn("This is a warning", "attr1", 2319, "attr2", "foo")
+    log.Error("This is an error", "attr1", 2319, "attr2", "foo")
+    log.Log(context.Background(), slog.LevelError+1, "This is a error+1")
+    log.Log(context.Background(), slog.LevelError+2, "This is a error+2")
+}
+```
+![color package screenshot](color/screenshot.png)
+
 ## Mailgun History
 Several of the packages here are modified versions of libraries used successfully during my time at [Mailgun](https://github.com/mailgun).
 Some of the original packages can be found [here](https://github.com/mailgun/holster). 
