@@ -190,6 +190,10 @@ func (t *frozenTicker) Stop() {
 	t.t.Stop()
 }
 
+func (t *frozenTicker) Reset(d time.Duration) {
+	t.t.Reset(d)
+}
+
 func (ft *frozenTime) NewTicker(d time.Duration) Ticker {
 	if d <= 0 {
 		panic(errors.New("non-positive interval for NewTicker"))

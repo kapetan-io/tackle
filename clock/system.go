@@ -56,6 +56,10 @@ func (t *systemTicker) Stop() {
 	t.t.Stop()
 }
 
+func (t *systemTicker) Reset(d time.Duration) {
+	t.t.Reset(d)
+}
+
 func (st *systemTime) NewTicker(d time.Duration) Ticker {
 	t := time.NewTicker(d)
 	return &systemTicker{t}
