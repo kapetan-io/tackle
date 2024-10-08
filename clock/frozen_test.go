@@ -212,6 +212,12 @@ func (s *FrozenSuite) TestTicker() {
 	clock.Advance(1)
 	s.Require().Equal(<-t.C(), s.epoch.Add(900))
 
+	t.Reset(200)
+	clock.Advance(100)
+	s.assertNotFired(t.C())
+	clock.Advance(100)
+	s.Require().Equal(<-t.C(), s.epoch.Add(1100))
+
 	t.Stop()
 	clock.Advance(300)
 	s.assertNotFired(t.C())

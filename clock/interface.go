@@ -11,6 +11,7 @@ type Timer interface {
 
 // Ticker see time.Ticker.
 type Ticker interface {
+	Reset(d time.Duration)
 	C() <-chan time.Time
 	Stop()
 }
