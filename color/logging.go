@@ -180,14 +180,22 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		level = levelAttr.Value.String() + ":"
 
 		if r.Level <= slog.LevelDebug {
+			level = h.opts.ColorFunc(FgHiBlack, level)
+		} else if r.Level == slog.LevelDebug+1 {
 			level = h.opts.ColorFunc(FgWhite, level)
-		} else if r.Level <= slog.LevelInfo {
+		} else if r.Level == slog.LevelDebug+2 {
+			level = h.opts.ColorFunc(FgYellow, level)
+		} else if r.Level == slog.LevelDebug+3 {
+			level = h.opts.ColorFunc(FgBlue, level)
+		} else if r.Level < slog.LevelInfo {
+			level = h.opts.ColorFunc(FgWhite, level)
+		} else if r.Level < slog.LevelWarn {
 			level = h.opts.ColorFunc(FgCyan, level)
-		} else if r.Level <= slog.LevelWarn {
+		} else if r.Level < slog.LevelError {
 			level = h.opts.ColorFunc(FgHiBlue, level)
-		} else if r.Level <= slog.LevelError {
+		} else if r.Level == slog.LevelError {
 			level = h.opts.ColorFunc(FgHiYellow, level)
-		} else if r.Level <= slog.LevelError+1 {
+		} else if r.Level == slog.LevelError+1 {
 			level = h.opts.ColorFunc(FgHiMagenta, level)
 		} else if r.Level > slog.LevelError+1 {
 			level = h.opts.ColorFunc(FgHiRed, level)
