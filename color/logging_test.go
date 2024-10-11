@@ -57,9 +57,16 @@ func TestSuppressAttrs(t *testing.T) {
 }
 
 func TestColor(t *testing.T) {
-	log := slog.New(color.NewLog(nil))
+	log := slog.New(color.NewLog(&color.LogOptions{
+		HandlerOptions: slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}))
 	fmt.Printf("\n--- Default Options ---\n")
 	log.Debug("This is a debug", "attr1", 2319, "attr2", "foo")
+	log.Log(context.Background(), slog.LevelDebug+1, "This is a debug+1", "attr1", 2319, "attr2", "foo")
+	log.Log(context.Background(), slog.LevelDebug+2, "This is a debug+2", "attr1", 2319, "attr2", "foo")
+	log.Log(context.Background(), slog.LevelDebug+3, "This is a debug+3", "attr1", 2319, "attr2", "foo")
 	log.Info("This is a info", "attr1", 2319, "attr2", "foo")
 	log.Warn("This is a warning", "attr1", 2319, "attr2", "foo")
 	log.Error("This is an error", "attr1", 2319, "attr2", "foo")
