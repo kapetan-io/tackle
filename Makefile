@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 LINT = $(GOPATH)/bin/golangci-lint
-LINT_VERSION = 1.56.2
+LINT_VERSION = v1.61.0
 
 $(LINT): ## Download Go linter
 	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin $(LINT_VERSION)
