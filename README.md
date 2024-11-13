@@ -1,9 +1,25 @@
-# Tackle
+
+
+<h2 align="center">
+<img src="docs/tackle-logo.png" alt="Tackle Box" width="800" /><br />
 A tackle box of libraries for golang.
+</h2>
+
+[![GitHub tag](https://img.shields.io/github/tag/kapetan-io/tackle?include_prereleases=&sort=semver&color=blue)](https://github.com/kapetan-io/tackel/releases/)
+[![CI](https://github.com/kapetan-io/tackle/workflows/CI/badge.svg)](https://github.com/kapetan-io/tackle/actions?query=workflow:"CI")
+[![License](https://img.shields.io/badge/License-Apache-blue)](#license)
 
 All packages have ZERO external dependencies outside the standard golang library. The only exception is for tests
 which depend upon `github.com/stretchr/testify`. Tackle is intended as a place for small, but useful packages which
 any golang developer may find useful, without a needing a dependency review.
+
+## Libraries
+- [Set](#set-config-values) - Avoid the if/else spaghetti of configuration defaults
+- [Random](#random) - Functions to generate random data for testing
+- [Clock](#clock) - Freeze, Set and Advance time during testing
+- [Color](#color) - Add colorized output to slog messages
+- [AutoTLS](#autotls) - Generate TLS certificates automatically
+- [Wait](#wait) - Simple go routine management with fan out and go routine cancellation
 
 ## SET config values
 Simplify setting default values during configuration.
@@ -48,7 +64,7 @@ set.IsZero(value)
 set.IsZeroValue(reflect.ValueOf(value))
 ```
 
-## Random 
+## Random
 Is a collection of functions which are useful in testing
 ```go
 package main

@@ -23,15 +23,8 @@ func TestFanOut(t *testing.T) {
 	close(ch)
 
 	var results []int
-LOOP:
-	for {
-		select {
-		case v, ok := <-ch:
-			if !ok {
-				break LOOP
-			}
-			results = append(results, v)
-		}
+	for v := range ch {
+		results = append(results, v)
 	}
 	assert.Equal(t, 10, len(results))
 
