@@ -2,7 +2,8 @@
 A tackle box of libraries for golang.
 
 All packages have ZERO external dependencies outside the standard golang library. The only exception is for tests
-which depend upon `github.com/stretchr/testify`.
+which depend upon `github.com/stretchr/testify`. Tackle is intended as a place for small, but useful packages which
+any golang developer may find useful, without a needing a dependency review.
 
 ## SET config values
 Simplify setting default values during configuration.
@@ -19,11 +20,13 @@ var Config struct {
 
 config := Config{}
 
+// Sets Bar to 200 if Bar is not already set
+set.Default(&config.Bar, 200)
+
 // Supply additional default values and set.Default() will
 // choose the first default that is not of zero value
 set.Default(&config.Foo, os.Getenv("FOO"), "default")
-// Sets Bar to 200 if Bar is not already set
-set.Default(&config.Bar, 200)
+
 // Sets Bang to the environment variable "BANG" if set, else sets the
 // value to 5.0
 set.Default(&config.Bang, set.EnvNumber[float64]("BANG"), 5.0)
@@ -239,7 +242,8 @@ func main() {
         panic(err)
     }
 
-    // After Setup() returns without error `tls` will be populated with relevant TLS config information
+    // After Setup() returns without error `tls` will be populated with
+    // relevant TLS config information.
     // tls.ServerTLS <-- the server certificates
     // tls.ClientTLS <-- the client certificates
 
@@ -279,14 +283,85 @@ func main() {
 }
 ```
 
+## Wait
+`Wait.Group` is a simplification of golang standard `sync.Waitgroup` with item and error collection included. 
+
+> NOTE: You should not use `wait` with golang 1.21 or less. 1.22 fixes closure scope issues with previous golang versions.
+> See https://go.dev/blog/loopvar-preview for details
+
+Run many routines over a collection with `.Go()`
+```go
+import "github.com/kapetan-io/tackle/wait"
+items := []int{0, 1, 3, 4, 5}
+
+var wg wait.Group
+for _, item := range items {
+    wg.Go(func() {
+        fmt.Printf("Item: %d\n", item)
+        time.Sleep(time.Nanosecond * 50)
+    })
+}
+
+wg.Wait()
+```
+
+Loop `.Until()` `.Stop()`is called
+```go
+import "github.com/kapetan-io/tackle/wait"
+var wg wait.Group
+
+wg.Until(func(done chan struct{}) bool {
+    select {
+    case <-time.Tick(time.Second):
+        // Do some periodic thing
+    case <-done:
+        return false
+    }
+    return true
+})
+
+// Close the done channel and wait for the routine to exit
+wg.Stop()
+```
+
+#### Group API
+- `Group.Go()` - Runs the provided function in a goroutine
+- `Group.Loop()` - Runs the provided function in a goroutine until the function returns false
+- `Group.Run()` - Runs the provided function in a goroutine collecting any errors which is returned by `Group.Wait()`
+- `Group.Until()` - Runs the provided function until `Group.Stop()` is called
+
+### FanOut
+FanOut spawns a new go-routine each time `.Run()` is called until `size` is reached, subsequent calls to `.Run()`
+will block until previous `.Run()` routines have completed. This API allows the user to control how many routines
+will run concurrently. Calling `.Wait()` then collects any errors from the routines once they have all completed.
+
+NOTE: `FanOut` allows you to control how many goroutines spawn at a time while `WaitGroup` will not.
+
+```go
+import "github.com/kapetan-io/tackle/wait"
+
+// Insert 10 items into a cassandra database concurrently
+fanOut := wait.NewFanOut(10)
+
+for _, item := range items {
+    fanOut.Run(func() error {
+        return db.ExecuteQuery("INSERT INTO tbl (id, field) VALUES (?, ?)",
+            item.Id, item.Field)
+        return nil
+    })
+}
+
+// Wait for any outstanding go routines
+// to finish and collect errors if any
+err := fanOut.Wait()
+if err != nil {
+    panic(err)
+}
+```
+
 ## Mailgun History
 Several of the packages here are modified versions of libraries used successfully during my time at [Mailgun](https://github.com/mailgun).
 Some of the original packages can be found [here](https://github.com/mailgun/holster). 
 
 Tackle differs from Holster in one specific way, unlike Holster which became a dumping ground for often used libraries and useful 
 tools internal to Mailgun. Tackle is strictly for packages with no external dependencies other than the golang standard library. 
-Code from holster has been updated and un-necessary external dependencies removed. In some cases, functionality was removed to avoid
-an external dependency. 
-
-Tackle is intended as a place for small, but useful packages which any golang developer may find useful, without a needing a 
-dependency review.
