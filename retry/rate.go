@@ -29,7 +29,7 @@ type Rate struct {
 
 func NewRate(windowSize int) *Rate {
 	return &Rate{
-		buckets:    make([]int, windowSize+1),
+		buckets:    make([]int, windowSize),
 		windowSize: windowSize,
 	}
 }
@@ -50,42 +50,27 @@ func (m *Rate) Rate(now time.Time) float64 {
 
 	m.shiftWindow(now)
 
-	var first, sum float64
+	var sum float64
 	var bucketsUsed int
 	pos := m.pos
 
+	// Figure out how many buckets should be used in the rate calculation
 	for i := 0; i < len(m.buckets); i++ {
 		pos = (pos + 1) % len(m.buckets)
+		// skip buckets with no hits
 		if m.buckets[pos] == 0 {
 			continue
 		}
 		bucketsUsed++
-
-		if first == 0 {
-			first = float64(m.buckets[pos])
-			continue
-		}
 		sum += float64(m.buckets[pos])
 	}
-	var seconds time.Duration
 
-	// Avoid adding weight to a window that isn't full
-	if bucketsUsed < len(m.buckets) {
-		seconds = time.Duration(bucketsUsed-1) * time.Second
-		seconds += m.last.Sub(roundDown(m.last))
-		sum += first
-	} else {
-		seconds = time.Duration(m.windowSize) * time.Second
-		weight := 1.0 - float64(m.last.Sub(roundDown(m.last)))/float64(time.Second)
-		sum += weight * first
-	}
-
+	seconds := time.Duration(bucketsUsed) * time.Second
 	if seconds < time.Second {
 		seconds = time.Second
 	}
 
-	result := sum / seconds.Seconds()
-	return result
+	return sum / seconds.Seconds()
 }
 
 // shiftWindow manages moving the window according to the time provided.
@@ -123,7 +108,6 @@ func (m *Rate) shiftWindow(now time.Time) {
 		m.buckets[pos] = 0
 	}
 	m.pos = (m.pos + adv) % len(m.buckets)
-	m.last = m.last.Add(time.Duration(adv) * time.Second)
 }
 
 // roundDown rounds the current time down to the nearest second

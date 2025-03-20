@@ -44,7 +44,6 @@ func (b *budget) Failure(now time.Time, hits int) {
 	defer b.mutex.Unlock()
 	b.mutex.Lock()
 	b.failure.Add(now, hits)
-	b.attempt.Add(now, 0)
 }
 
 // Attempt records a number of attempts for the given time.
@@ -52,7 +51,6 @@ func (b *budget) Failure(now time.Time, hits int) {
 func (b *budget) Attempt(now time.Time, hits int) {
 	defer b.mutex.Unlock()
 	b.mutex.Lock()
-	b.failure.Add(now, 0)
 	b.attempt.Add(now, hits)
 }
 

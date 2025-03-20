@@ -217,9 +217,10 @@ func Do(ctx context.Context, p Policy, op func(context.Context, int) error) erro
 		default:
 			if p.Budget.IsOver(time.Now()) {
 				fmt.Printf("Budget Over\n")
+				fmt.Printf("Sleep Interval: %s\n", p.Interval.Next(attempt))
 				time.Sleep(p.Interval.Next(attempt))
 				p.Budget.Attempt(time.Now(), 1)
-				attempt++
+				//attempt++
 				continue
 			}
 

@@ -23,32 +23,31 @@ func TestRate(t *testing.T) {
 			{
 				name:   "two-bucket",
 				calls:  []int{5, 3},
-				expect: "6.67",
+				expect: "4.00",
 			},
 			{
 				name:   "three-bucket",
 				calls:  []int{5, 5, 1},
-				expect: "5.00",
+				expect: "3.67",
 			},
 			{
 				name:   "ten-bucket",
 				calls:  []int{5, 5, 5, 5, 5, 5, 5, 5, 5, 1},
-				expect: "5.00",
+				expect: "4.60",
 			},
 			{
-				name: "weighted-avg",
+				name: "avg",
 				calls: []int{
 					5, // outside the window
 					5, 5, 5, 5, 5, 5, 5, 5, 5, 1},
-				expect: "5.00",
+				expect: "4.60",
 			},
 			{
-				name: "weighted-avg-large",
+				name: "avg-large",
 				calls: []int{
-					1000000, // outside the window
-					2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+					10000, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 				},
-				expect: "80002.00",
+				expect: "1001.80",
 			},
 			{
 				name: "shift-window",
@@ -57,30 +56,15 @@ func TestRate(t *testing.T) {
 					5, // outside the window
 					1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 				},
-				expect: "1.40",
+				expect: "1.00",
 			},
-			//{
-			//	name: "advance-zero-1",
-			//	calls: []int{
-			//		2, // outside the window
-			//		2, 2, 2, 2, 2, 0, 0, 0, 0, 0,
-			//	},
-			//	expect: "2.31",
-			//},
-			//{
-			//	name: "advance-zero-2",
-			//	calls: []int{
-			//		2, 2, 0, 0, 0, 0, 0, 0, 0, 0,
-			//	},
-			//	expect: "2.73",
-			//},
 		}
 
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
 				mr := NewRate(10)
 				tm := time.Date(2018, time.February, 22, 22, 24, 53, 200000000, time.UTC)
-				fmt.Printf("Start Time: %s\n", tm.String())
+				//fmt.Printf("Start Time: %s\n", tm.Format(time.TimeOnly))
 				for _, n := range c.calls {
 					tm = tm.Add(time.Second)
 					// Call Add() 'n' times
@@ -88,7 +72,7 @@ func TestRate(t *testing.T) {
 						mr.Add(tm, 1)
 					}
 				}
-				fmt.Printf("End Time: %s\n", tm.String())
+				//fmt.Printf("End Time: %s\n", tm.Format(time.TimeOnly))
 				assert.Equal(t, c.expect, fmt.Sprintf("%.2f", mr.Rate(tm)))
 			})
 		}
@@ -111,6 +95,40 @@ func TestRate(t *testing.T) {
 		mr.Add(now, 5)
 		assert.Equal(t, "5.00", fmt.Sprintf("%.2f", mr.Rate(now)))
 		//t.Logf("AFTER  mr = %+v", mr)
+	})
+
+	t.Run("TimeGapExtended", func(t *testing.T) {
+		mr := NewRate(10)
+		now := time.Date(2018, time.February, 22, 22, 24, 53, 200000000, time.UTC)
+		mr.Add(now, 5)
+		assert.Equal(t, "5.00", fmt.Sprintf("%.2f", mr.Rate(now)))
+
+		// Elapse some large amount of time outside our window
+		now = now.Add(time.Minute * 20)
+
+		// Now fill up the window
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 5)
+		now = now.Add(time.Second)
+		mr.Add(now, 1)
+		assert.Equal(t, "4.60", fmt.Sprintf("%.2f", mr.Rate(now)))
 	})
 }
 
