@@ -2,6 +2,8 @@ package wait
 
 import "fmt"
 
+// TODO: Replace this with standard `errors.Join()`
+
 // MultiError encapsulates multiple errors.
 //
 // Borrowed from the App Engine SDK.

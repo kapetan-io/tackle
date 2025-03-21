@@ -20,6 +20,7 @@ any golang developer may find useful, without a needing a dependency review.
 - [Color](#color) - Add colorized output to slog messages
 - [AutoTLS](#autotls) - Generate TLS certificates automatically
 - [Wait](#wait) - Simple go routine management with fan out and go routine cancellation
+- [Retry](#retry) - Retry functions with exponential backoff and retry budgets
 
 ## SET config values
 Simplify setting default values during configuration.
@@ -375,9 +376,231 @@ if err != nil {
 }
 ```
 
-## Mailgun History
-Several of the packages here are modified versions of libraries used successfully during my time at [Mailgun](https://github.com/mailgun).
-Some of the original packages can be found [here](https://github.com/mailgun/holster). 
+## Retry
+<h2 align="center">
+<img src="docs/retry-budget-graph.png" alt="Retry Budget Graph" width="800" />
+</h2>
 
-Tackle differs from Holster in one specific way, unlike Holster which became a dumping ground for often used libraries and useful 
-tools internal to Mailgun. Tackle is strictly for packages with no external dependencies other than the golang standard library. 
+- RED line indicates the number of retries
+- GREEN line indicates the availability of the resource
+- BLUE line indicates successful access of the resource.
+ 
+You can see how exponential backoff retry results in a high occurrence of retries during the beginning of the outage
+while an exponential backoff WITH a budget limits it's impact on the resource during outage. However, recovery time 
+is quicker with simple exponential back off than with budget, as the budget window must expire before requests are
+allowed again.
+
+#### Usage
+The retry package is a collection of functions and structs which allow the creation of custom retry exponential back 
+off policies and retry budgets within your application. It also includes common test helpers useful for implementing
+functional tests. Retries are cancelable via `context.Context` and by returning `retry.ErrCancelRetry` from the call
+back function.
+```go
+import "github.com/kapetan-io/tackle/retry"
+
+ctx, cancel := context.WithCancel(context.Background())
+var resp DoThingResponse
+
+// If DoThing() returns an error, this operation is retried using the retry.PolicyDefault which is an 
+// exponential backoff. Retries continue until the context is cancelled
+err := retry.Until(ctx, func(ctx context.Context, attempt int) error {
+    return DoThing(ctx, &DoThingRequest{}, &resp)
+})
+
+// If DoThing() returns an error, this operation is retried until the number of attempts has expired 
+// and sleeps between retries starting with the provided sleep time (5 seconds) and increments sleep time
+// using the default exponential back off interval `retry.IntervalBackOff`
+err = retry.UntilAttempts(ctx, 10, 5*time.Second, func(ctx context.Context, attempt int) error {
+    return DoThing(ctx, &DoThingRequest{}, &resp)
+})
+
+// Define a custom retry policy (thread safe) which can be used globally by all
+// retry.Do() calls in the application.
+p := retry.Policy{
+    // With a custom back off configuration
+    Interval: retry.IntervalBackOff{
+        Min:    time.Millisecond,
+        Max:    time.Millisecond * 100,
+        Factor: 2,
+    },
+    // Infinite retry if `Attempts = 0`
+    Attempts: 5,
+    // Optional budget to ensure the resource being retried
+    // isn't overloaded with retries
+    Budget: nil,
+}
+
+// If DoThing() returns an error, this operation is retried using the provided policy
+err = retry.On(ctx, p, func(ctx context.Context, attempt int) error {
+	return DoThing(ctx, &DoThingRequest{}, &resp)
+})
+```
+
+#### Integrate Retry with custom code
+The `Policy` and `Interval` interfaces are designed to be re-used outside the `retry` package, for users who need
+more fine grain control of their retry strategies. To use an `Interval` in custom code, simply instantiate the
+`Interval` then call `Next()` on the interval to retrieve the next sleep duration based on the number of attempts.
+
+```go
+var it = retry.IntervalBackOff {
+    Rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
+    Min:    500 * time.Millisecond,
+    Max:    time.Minute,
+    Factor: 1.5,
+    Jitter: 0.5,
+}
+
+func YourRemoteCall(ctx context.Context) {
+    var attempt int
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+            _, err := http.Get("https://google.com")
+            if err != nil {
+                time.Sleep(it.Next(attempt))
+                attempt++
+                continue
+            }
+            break
+        }
+    }
+}
+```
+
+#### Retry Test Helpers
+These retry helpers are useful when building E2E or Functional tests where a collection of tests will eventually pass
+due to some async nature of the application being tested.
+
+```go
+func TestTellJoke(t *testing.T) {
+    // Continues to run the assertions up to 10 times, sleeping 100ms in between retries
+    // until all the assertions pass or attempts are exhausted.
+    pass := retry.UntilPass(t, 10, time.Millisecond*100, func (t retry.TestingT) {
+        resp, err := TellJoke()
+
+        // `require` assertion protects the test from progressing if there is an error
+        require.NoError(t, err)
+        require.NotNil(t, resp)
+
+        assert.Equal(t, true, resp.HasSomeJokes)
+        assert.Equal(t, "your mom so fat...", resp.Answer)
+
+        // You can also use non testify assertions
+        if resp.IsFunny != true {
+            t.Errorf("response was not funny")
+        }
+    })
+
+    // If UntilPass() returns true, we know the test eventually passed and our test can continue.
+    require.True(t, pass)
+}
+```
+
+When testing services, it is very common for the test to wait until the service under test is running and
+accepting connections, for such tests. `retry.UntilConnect()` is very useful
+```go
+func TestWaitServer(t *testing.T) {
+    // Start our service
+    s := service.SpawnServer()
+
+    // Wait until we can connect, then continue with the test
+    retry.UntilConnect(t, 10, time.Millisecond*100, s.Address())
+
+    // We can now safely send requests to the server
+    c, err := service.NewClient(s)
+    require.NoError(t, err)
+    resp, err := c.TellJoke()
+    require.NoError(t, err)
+    assert.NotNil(t, resp)
+}
+```
+
+#### Budgets
+A budget can be a shared global budget for the application which limits the total number of retries.
+Custom thread safe budgets can be defined and shared across the application which obey rate limits imposed
+by the resource being retried.
+
+Once the number of retries exceeds the budget, `retry.Do()` will sleep using the provided `Interval` asking
+the budget if the `Budget.IsOver()` the budget limit, only allowing the retry to occur if we are within
+retry budget.
+
+```go
+// Defines a simple 500 request per second budget (Thread safe)
+budget := retry.NewSimpleBudget(500, time.Second)
+
+var Policy = retry.Policy{
+    // How we calculate the sleep time between retries and between budget checks
+    Interval: retry.IntervalBackOff{
+        Rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
+        Min:    500 * time.Millisecond,
+        Max:    time.Minute,
+        Factor: 1.5,
+        Jitter: 0.5,
+    },
+    // Specify the budget to be used for this policy
+    Budget:   budget,
+    // Infinite retries
+    Attempts: 0,
+}
+```
+
+#### Retry CLI
+Retry includes a CLI used to calculate an exponential backoff schedule, useful in testing back off configurations
+
+Installation
+```bash
+$ go install ./cmd/retry
+```
+
+Execution and Usage
+```bash
+$ retry
+  Usage: retry -attempts 10 -min 500ms -max 1m0s -factor 1.5 -jitter 0.5
+
+  Attempt: 0 BackOff: 500ms WithJitter: 359.736082ms Jitter Range: [250ms - 750ms]
+  Attempt: 1 BackOff: 750ms WithJitter: 675.611954ms Jitter Range: [375ms - 1.125s]
+  Attempt: 2 BackOff: 1.125s WithJitter: 611.039003ms Jitter Range: [562.5ms - 1.6875s]
+  Attempt: 3 BackOff: 1.6875s WithJitter: 1.955070657s Jitter Range: [843.75ms - 2.53125s]
+  Attempt: 4 BackOff: 2.53125s WithJitter: 2.561133823s Jitter Range: [1.265625s - 3.796875s]
+  Attempt: 5 BackOff: 3.796875s WithJitter: 5.508541149s Jitter Range: [1.8984375s - 5.6953125s]
+  Attempt: 6 BackOff: 5.6953125s WithJitter: 4.373686656s Jitter Range: [2.84765625s - 8.54296875s]
+  Attempt: 7 BackOff: 8.54296875s WithJitter: 6.257106109s Jitter Range: [4.271484375s - 12.814453125s]
+  Attempt: 8 BackOff: 12.814453125s WithJitter: 12.994089755s Jitter Range: [6.407226562s - 19.221679687s]
+  Attempt: 9 BackOff: 19.221679687s WithJitter: 13.437161293s Jitter Range: [9.610839843s - 28.83251953s]
+```
+
+#### Retry API
+Retry
+- `retry.On()` - Retries the provided operation using the policy provided
+- `retry.Until()` - Retries the provided operation until it succeeds
+- `retry.UntilAttempts()` - Identical to Until but with Attempts and initial sleep interval
+- `retry.Interval` - The interval interface
+- `retry.IntervalSleep` - An interval implementation that sleeps a constant duration each interval
+- `retry.IntervalBackOff` - An exponential backoff interval implementation
+- `retry.IntervalBackOff.Explain()` - Explains how the sleep duration was calculated for the provided attempt
+- `retry.IntervalBackOff.ExplainString()` - Identical to Explain() but returned as a string
+- `retry.Policy` - The policy struct used by `On()`, `Until()` and `UntilAttempts()`
+- `retry.PolicyDefault` - The default exponential backoff policy
+- `retry.ErrCancelRetry` - Used with `On()`, `Until()` and `UntilAttempts()` to cancel the retry loop
+
+Testing
+- `retry.UntilPass()` - Retry tests using `testing.T` until they pass
+- `retry.UntilConnect()` - Returns when the address is accepting connections
+
+Budgets
+- `retry.Budget` - the budget interface
+- `retry.NewSimpleBudget()` - Creates a simple single time window based budget
+
+Rates
+- `retry.NewRate` - Intended to be used to build complex Budgets like sliding window or rate limit based Budgets
+
+## Mailgun History
+Several of the packages here are modified versions of libraries used successfully during my time at
+[Mailgun](https://github.com/mailgun). Some of the original packages can be found
+[here](https://github.com/mailgun/holster). 
+
+Tackle differs from Holster in one specific way, unlike Holster which became a dumping ground for often used
+libraries and useful tools internal to Mailgun. Tackle is strictly for packages with no external dependencies other
+than the golang standard library. 
