@@ -21,13 +21,13 @@ import (
 
 func TestNewBudget(t *testing.T) {
 	t.Run("InitialState", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 		assert.False(t, budget.IsOver(now), "New budget should not be over")
 	})
 
 	t.Run("ImmediateFailure", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Add a single failure to exceed the budget. Since there are no
@@ -38,7 +38,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("OverBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Add some attempts
@@ -51,7 +51,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("UnderBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Add some attempts
@@ -64,7 +64,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("RecoveryAfterAttempts", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Add failures to exceed the budget
@@ -80,7 +80,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("ZeroAttemptRate", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Only add failures and no attempts
@@ -90,7 +90,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("ZeroFailureRate", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Only add attempts
@@ -100,7 +100,7 @@ func TestNewBudget(t *testing.T) {
 	})
 
 	t.Run("TimeDecay", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		now := time.Now()
 
 		// Add failures to exceed the budget
@@ -145,7 +145,7 @@ func TestBudgetWithDo(t *testing.T) {
 	}
 
 	t.Run("UnderBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0)
+		budget := retry.NewBudget(2.0, time.Minute)
 		policy := retry.Policy{
 			Interval: retry.IntervalSleep(100 * time.Millisecond),
 			Budget:   budget,
@@ -167,7 +167,7 @@ func TestBudgetWithDo(t *testing.T) {
 	})
 
 	t.Run("OverBudget", func(t *testing.T) {
-		budget := retry.NewBudget(0.5) // Set a very low ratio to trigger budget exceeded
+		budget := retry.NewBudget(0.5, time.Minute) // Set a very low ratio to trigger budget exceeded
 		policy := retry.Policy{
 			Interval: retry.IntervalSleep(10 * time.Millisecond),
 			Budget:   budget,
@@ -235,7 +235,7 @@ func TestBudgetGraph(t *testing.T) {
 			Factor: 1.01,
 			Jitter: 0.50,
 		},
-		Budget:   retry.NewBudget(10.0),
+		Budget:   retry.NewBudget(10.0, time.Minute),
 		Attempts: 0,
 	}, client, "with-budget")
 }

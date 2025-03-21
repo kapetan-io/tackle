@@ -1,7 +1,6 @@
 package retry
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -15,13 +14,13 @@ type Budget interface {
 	Failure(now time.Time, hits int)
 	// Attempt records a number of attempts for the time provided.
 	Attempt(now time.Time, hits int)
+	// Success records a number of successes for the time provided
+	Success(now time.Time, hits int)
 }
 
 type budget struct {
-	mutex   sync.Mutex
-	ratio   float64
-	attempt *Rate
-	failure *Rate
+	// TODO
+	mutex sync.Mutex
 }
 
 // NewBudget creates a new Budget with the specified target failure rate.
@@ -29,13 +28,10 @@ type budget struct {
 // for limiting the total number of retries to a resource from an application,
 // regardless of concurrent threads accessing the resource.
 //
-// 'ratio' is the maximum ratio of failures to successes allowed within a 60 second window.
-func NewBudget(ratio float64) Budget {
-	return &budget{
-		attempt: NewRate(60), // 1-minute window
-		failure: NewRate(60), // 1-minute window
-		ratio:   ratio,
-	}
+// 'ratio' is the maximum ratio of failures to successes allowed within the provided window.
+// 'window' is the duration of the rolling window the budget is valid for
+func NewBudget(ratio float64, window time.Duration) Budget {
+	return &budget{}
 }
 
 // Failure records a number of failures for the given time.
@@ -43,7 +39,7 @@ func NewBudget(ratio float64) Budget {
 func (b *budget) Failure(now time.Time, hits int) {
 	defer b.mutex.Unlock()
 	b.mutex.Lock()
-	b.failure.Add(now, hits)
+	// TODO
 }
 
 // Attempt records a number of attempts for the given time.
@@ -51,7 +47,15 @@ func (b *budget) Failure(now time.Time, hits int) {
 func (b *budget) Attempt(now time.Time, hits int) {
 	defer b.mutex.Unlock()
 	b.mutex.Lock()
-	b.attempt.Add(now, hits)
+	// TODO
+}
+
+// Success records a number of attempts for the given time.
+// This method is thread-safe.
+func (b *budget) Success(now time.Time, hits int) {
+	defer b.mutex.Unlock()
+	b.mutex.Lock()
+	// TODO
 }
 
 // IsOver determines if the current failure rate is over the budget.
@@ -59,27 +63,8 @@ func (b *budget) Attempt(now time.Time, hits int) {
 func (b *budget) IsOver(now time.Time) bool {
 	defer b.mutex.Unlock()
 	b.mutex.Lock()
-
-	failureRate := b.failure.Rate(now)
-	attemptRate := b.attempt.Rate(now)
-
-	// If there are no failures, we're not over budget
-	if failureRate == 0 {
-		return false
-	}
-
-	if attemptRate == 0 {
-		return true
-	}
-
-	fmt.Printf("Failure rate: %f\n", failureRate)
-	fmt.Printf("Attempt rate: %f\n", attemptRate)
-	// We're over budget if the ratio of failures to successes exceeds the specified ratio
-	fmt.Printf("Failure ratio: %f\n", failureRate/attemptRate)
-	if failureRate < attemptRate {
-
-	}
-	return failureRate/attemptRate > b.ratio
+	// TODO
+	return false
 }
 
 // noOpBudget is a Budget implementation that always allows retries.
@@ -96,3 +81,6 @@ func (noOpBudget) Failure(now time.Time, hits int) {}
 
 // Attempt is a no-op for noOpBudget.
 func (noOpBudget) Attempt(now time.Time, hits int) {}
+
+// Success is a no-op for noOpBudget.
+func (noOpBudget) Success(now time.Time, hits int) {}

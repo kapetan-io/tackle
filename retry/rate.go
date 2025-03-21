@@ -1,7 +1,6 @@
 package retry
 
 import (
-	"fmt"
 	"math"
 	"time"
 )
@@ -9,80 +8,77 @@ import (
 // Rate calculates the hit rate per second within a requested window size.
 // It uses a simplistic version of a ring buffer to track hits within buckets.
 type Rate struct {
-	// last is the last time Add or Rate was called. It is used to
-	// identify the last bucket in buckets hits were added.
+	// last is the last time Add or Rate was called to avoid adding
+	// to buckets in the past
 	last time.Time
 
-	// buckets is the time buckets where each bucket represents one second.
+	// buckets is the time buckets where each bucket represents one interval.
 	// and the number in the bucket represents how many hits occurred during
-	// that one second interval. buckets is a simple ring buffer.
+	// that interval. buckets is a simple ring buffer.
 	buckets []int
 
-	// windowSize is the size of the window, which is smaller than the actual
-	// size of the buckets.
-	windowSize int
+	// interval is the interval each bucket in the sliding window represents
+	interval time.Duration
 
-	// pos is the current position inside the buckets, which is treated
-	// like a ring buffer.
+	// pos is the current position inside the ring buffer
 	pos int
+
+	// total is the sum of all hits in the current window
+	total int
 }
 
-func NewRate(windowSize int) *Rate {
+func NewRate(interval time.Duration, buckets int) *Rate {
 	return &Rate{
-		buckets:    make([]int, windowSize),
-		windowSize: windowSize,
+		buckets:  make([]int, buckets),
+		interval: interval,
 	}
 }
 
 func (m *Rate) Add(now time.Time, hits int) {
+	// Ignore calls with timestamps earlier than the last recorded time
 	if now.Before(m.last) {
 		return
 	}
 
+	// Shift the window if necessary
 	m.shiftWindow(now)
+
+	// Add hits to the current bucket
 	m.buckets[m.pos] += hits
+
+	// Update the total hits
+	m.total += hits
 }
 
 func (m *Rate) Rate(now time.Time) float64 {
+	// Return NaN for calls with timestamps earlier than the last recorded time
 	if now.Before(m.last) {
 		return math.NaN()
 	}
 
+	// Shift the window if necessary
 	m.shiftWindow(now)
 
-	var sum float64
-	var bucketsUsed int
-	pos := m.pos
-
-	// Figure out how many buckets should be used in the rate calculation
-	for i := 0; i < len(m.buckets); i++ {
-		pos = (pos + 1) % len(m.buckets)
-		// skip buckets with no hits
-		if m.buckets[pos] == 0 {
-			continue
-		}
-		bucketsUsed++
-		sum += float64(m.buckets[pos])
+	// If there are no hits, return 0
+	if m.total == 0 {
+		return 0.0
 	}
 
-	seconds := time.Duration(bucketsUsed) * time.Second
-	if seconds < time.Second {
-		seconds = time.Second
-	}
-
-	return sum / seconds.Seconds()
+	// Calculate the rate: total hits / window duration in seconds
+	windowDuration := time.Duration(len(m.buckets)) * m.interval
+	return float64(m.total) / windowDuration.Seconds()
 }
 
 // shiftWindow manages moving the window according to the time provided.
-// Although `windowSize` is the size of the window, we keep one additional bucket
-// `windowSize+1` so we can preform a weighted average using the older buckets
-// outside our window.
 func (m *Rate) shiftWindow(now time.Time) {
 	defer func() {
+		// Update the last recorded time
 		m.last = now
 	}()
 
+	// Round down the current time to the nearest interval
 	rt := roundDown(now)
+
 	// If this is our first time, or the current time precedes or is equal to our
 	// last update, no window change is needed as time has not advanced.
 	if m.last.IsZero() || !rt.After(m.last) {
@@ -90,9 +86,9 @@ func (m *Rate) shiftWindow(now time.Time) {
 	}
 
 	// Calculate the number of buckets to advance
-	adv := int(rt.Sub(roundDown(m.last)) / time.Second)
+	adv := int(rt.Sub(roundDown(m.last)) / m.interval)
 	if adv <= 0 {
-		panic(fmt.Sprintf("assert failed: adv = %d; rt = %v, m.last = %v", adv, rt, m.last))
+		return
 	}
 
 	// Avoid advancing further than the size of our ring buffer
@@ -100,21 +96,15 @@ func (m *Rate) shiftWindow(now time.Time) {
 		adv = len(m.buckets)
 	}
 
-	// advance through the buckets starting at head and
-	// clear any hits for each bucket we advance.
-	pos := m.pos
+	// Advance through the buckets, clearing hits and updating the total
 	for i := 0; i < adv; i++ {
-		pos = (pos + 1) % len(m.buckets)
-		m.buckets[pos] = 0
+		m.pos = (m.pos + 1) % len(m.buckets)
+		m.total -= m.buckets[m.pos]
+		m.buckets[m.pos] = 0
 	}
-	m.pos = (m.pos + adv) % len(m.buckets)
 }
 
-// roundDown rounds the current time down to the nearest second
+// roundDown rounds the current time down to the nearest interval
 func roundDown(now time.Time) time.Time {
-	r := now.Round(time.Second)
-	if r.After(now) {
-		r = r.Add(-time.Second)
-	}
-	return r
+	return now.Truncate(time.Second)
 }
