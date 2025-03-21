@@ -36,7 +36,12 @@ func TestRate(t *testing.T) {
 				expect: "1.00",
 			},
 			{
-				name: "avg",
+				name:   "avg",
+				calls:  []int{5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
+				expect: "5.00",
+			},
+			{
+				name: "avg-window",
 				calls: []int{
 					5, // outside the window
 					5, 5, 5, 5, 5, 5, 5, 5, 5, 1},
@@ -127,6 +132,29 @@ func TestRate(t *testing.T) {
 		now = now.Add(time.Second)
 		mr.Add(now, 1)
 		assert.Equal(t, "4.60", fmt.Sprintf("%.2f", mr.Rate(now)))
+	})
+
+	t.Run("CanZeroHits", func(t *testing.T) {
+		mr := NewRate(time.Second, 10)
+		now := time.Date(2018, time.February, 22, 22, 24, 53, 000000000, time.UTC)
+		assert.Equal(t, "0.00", fmt.Sprintf("%.2f", mr.Rate(now)))
+
+		// fill up the window
+		for i := 0; i < 10; i++ {
+			now = now.Add(time.Second)
+			mr.Add(now, 5)
+		}
+		assert.Equal(t, "5.00", fmt.Sprintf("%.2f", mr.Rate(now)))
+
+		// Zero record a zero hit
+		now = now.Add(time.Second)
+		mr.Add(now, 0)
+		assert.Equal(t, "4.50", fmt.Sprintf("%.2f", mr.Rate(now)))
+
+		// Advance 10 seconds into the future, now the window should be empty
+		now = now.Add(time.Second * 10)
+		mr.Add(now, 0)
+		assert.Equal(t, "0.00", fmt.Sprintf("%.2f", mr.Rate(now)))
 	})
 }
 

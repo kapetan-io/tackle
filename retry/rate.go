@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// Rate calculates the hit rate per second within a requested window size.
-// It uses a simplistic version of a ring buffer to track hits within buckets.
 type Rate struct {
 	// last is the last time Add or Rate was called to avoid adding
 	// to buckets in the past
@@ -27,6 +25,10 @@ type Rate struct {
 	total int
 }
 
+// NewRate calculates the hit rate per second within a requested window size.
+// It uses a simplistic version of a ring buffer to track hits within buckets.
+// NOTE: This was intended to be used in a more complex SlidingWindow Budget
+// implementation, but I never finished it. =/
 func NewRate(interval time.Duration, buckets int) *Rate {
 	return &Rate{
 		buckets:  make([]int, buckets),

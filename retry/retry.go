@@ -141,16 +141,15 @@ func (s IntervalSleep) Next(_ int) time.Duration {
 //	Budget:   nil,
 //	Attempts: 0,
 //}
-
 type Policy struct {
 	// Interval is an interface which dictates how long the retry should sleep between attempts. Retry comes with
 	// two implementations called retry.IntervalBackOff which implements a backoff and retry.IntervalSleep which
 	// is a constant sleep interval with no backoff.
 	Interval Interval
 
-	// Budget is the budget used to determine if a retry should proceed. Budgets block
-	// retries until requests are under budget or the provided context is cancelled.
-	// Using a budget avoids generating excess load on the resource being retried,
+	// Budget is the Budget used to determine if a retry should proceed. Budgets block
+	// retries until requests are under Budget or the provided context is cancelled.
+	// Using a Budget avoids generating excess load on the resource being retried,
 	// once it has recovered. It also improves recovery time once the resource
 	// has recovered. Set to `nil` to ignore budgets
 	// See https://medium.com/yandex/good-retry-bad-retry-an-incident-story-648072d3cee6
@@ -177,13 +176,13 @@ var PolicyDefault = Policy{
 	Attempts: 0, // Infinite retries
 }
 
-// Until retries the provided operation using exponential backoff and the default budget until the
+// Until retries the provided operation using exponential backoff and the default Budget until the
 // context is cancelled
 func Until(ctx context.Context, op func(context.Context, int) error) error {
 	return Do(ctx, PolicyDefault, op)
 }
 
-// UntilAttempts retries the provided operation using exponential backoff and the default budget until the
+// UntilAttempts retries the provided operation using exponential backoff and the default Budget until the
 // number of attempts has been reached or context is cancelled
 func UntilAttempts(ctx context.Context, attempts int, sleep time.Duration, op func(context.Context, int) error) error {
 	return Do(ctx, Policy{
@@ -216,8 +215,6 @@ func Do(ctx context.Context, p Policy, op func(context.Context, int) error) erro
 			return ctx.Err()
 		default:
 			if p.Budget.IsOver(time.Now()) {
-				fmt.Printf("Budget Over\n")
-				fmt.Printf("Sleep Interval: %s\n", p.Interval.Next(attempt))
 				time.Sleep(p.Interval.Next(attempt))
 				p.Budget.Attempt(time.Now(), 1)
 				//attempt++
@@ -242,7 +239,6 @@ func Do(ctx context.Context, p Policy, op func(context.Context, int) error) erro
 				return err
 			}
 
-			fmt.Printf("Sleep Interval: %s\n", p.Interval.Next(attempt))
 			time.Sleep(p.Interval.Next(attempt))
 			attempt++
 		}

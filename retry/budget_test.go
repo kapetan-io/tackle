@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/kapetan-io/tackle/retry"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"math/rand"
 	"net/http"
@@ -19,147 +20,99 @@ import (
 	"time"
 )
 
-func TestNewBudget(t *testing.T) {
+func TestNewSimpleBudget(t *testing.T) {
 	t.Run("InitialState", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+		budget := retry.NewSimpleBudget(50, time.Minute)
 		now := time.Now()
-		assert.False(t, budget.IsOver(now), "New budget should not be over")
-	})
-
-	t.Run("ImmediateFailure", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
-		now := time.Now()
-
-		// Add a single failure to exceed the budget. Since there are no
-		// attempts the budget rate is exceeded
-		budget.Failure(now, 1)
-
-		assert.True(t, budget.IsOver(now), "Budget should be over")
+		assert.False(t, budget.IsOver(now))
 	})
 
 	t.Run("OverBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+		budget := retry.NewSimpleBudget(50, time.Second)
 		now := time.Now()
 
-		// Add some attempts
-		budget.Attempt(now, 10)
+		// Add failures to exceed the Budget
+		budget.Failure(now, 50)
 
-		// Add failures to exceed the budget
-		budget.Failure(now, 25)
-
-		assert.True(t, budget.IsOver(now), "Budget should be over after many failures")
+		assert.False(t, budget.IsOver(now))
+		budget.Failure(now, 1)
+		assert.True(t, budget.IsOver(now))
 	})
 
-	t.Run("UnderBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+	t.Run("RecoveryAfterIntervalElapsed", func(t *testing.T) {
+		budget := retry.NewSimpleBudget(50, time.Second)
 		now := time.Now()
 
-		// Add some attempts
-		budget.Attempt(now, 10)
+		// Add failures to exceed the Budget
+		budget.Failure(now, 51)
 
-		// Add failures, but not enough to exceed the budget
-		budget.Failure(now, 15)
+		assert.True(t, budget.IsOver(now))
 
-		assert.False(t, budget.IsOver(now), "Budget should not be over")
+		now = now.Add(time.Second + time.Millisecond)
+		assert.False(t, budget.IsOver(now))
 	})
 
-	t.Run("RecoveryAfterAttempts", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+	t.Run("IgnoreAttemptAndSuccess", func(t *testing.T) {
+		budget := retry.NewSimpleBudget(50, time.Second)
 		now := time.Now()
 
-		// Add failures to exceed the budget
-		budget.Failure(now, 25)
-		budget.Attempt(now, 10)
+		// Only add attempts && successes
+		budget.Attempt(now, 100)
+		budget.Success(now, 100)
 
-		assert.True(t, budget.IsOver(now), "Budget should be over after many failures")
-
-		// Add attempts to recover
-		budget.Attempt(now, 30)
-
-		assert.False(t, budget.IsOver(now), "Budget should recover after many attempts")
-	})
-
-	t.Run("ZeroAttemptRate", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
-		now := time.Now()
-
-		// Only add failures and no attempts
-		budget.Failure(now, 10)
-
-		assert.True(t, budget.IsOver(now), "Budget should be over with zero attempt rate")
-	})
-
-	t.Run("ZeroFailureRate", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
-		now := time.Now()
-
-		// Only add attempts
-		budget.Attempt(now, 10)
-
-		assert.False(t, budget.IsOver(now), "Budget should not be over with zero failure rate")
+		assert.False(t, budget.IsOver(now))
 	})
 
 	t.Run("TimeDecay", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+		budget := retry.NewSimpleBudget(19, time.Second)
 		now := time.Now()
 
-		// Add failures to exceed the budget
+		// Add failures to exceed the Budget
 		budget.Failure(now, 20)
-		budget.Attempt(now, 5)
 
-		assert.True(t, budget.IsOver(now), "Budget should be over after many failures")
+		assert.True(t, budget.IsOver(now))
 
 		// Move time forward by 30 seconds
 		futureTime := now.Add(30 * time.Second)
-		assert.True(t, budget.IsOver(futureTime), "Budget should still be over after 30 seconds")
+		assert.False(t, budget.IsOver(futureTime))
 
 		// Move time forward by another 31 seconds (total 61 seconds)
 		futureTime = now.Add(61 * time.Second)
-		assert.False(t, budget.IsOver(futureTime), "Budget should not be over after 61 seconds due to time decay")
+		assert.False(t, budget.IsOver(futureTime))
 
 		// Add a small number of failures
 		budget.Failure(futureTime, 5)
-		budget.Attempt(futureTime, 5)
 
-		assert.False(t, budget.IsOver(futureTime), "Budget should still not be over after adding a few failures")
+		assert.False(t, budget.IsOver(futureTime))
 
-		// Add more failures to exceed the budget again
+		// Add more failures to exceed the Budget again
 		budget.Failure(futureTime, 15)
-		assert.True(t, budget.IsOver(futureTime), "Budget should be over after adding many failures again")
+		assert.True(t, budget.IsOver(futureTime))
 	})
 }
 
 func TestBudgetWithDo(t *testing.T) {
 	ctx := context.Background()
-	var successCount, failureCount int
-	var lastAttempt, failures int
-
-	operation := func(ctx context.Context, attempt int) error {
-		lastAttempt = attempt
-		if attempt <= failures {
-			failureCount++
-			return errors.New("simulated failure")
-		}
-		successCount++
-		return nil
-	}
 
 	t.Run("UnderBudget", func(t *testing.T) {
-		budget := retry.NewBudget(2.0, time.Minute)
+		budget := retry.NewSimpleBudget(50, time.Second)
 		policy := retry.Policy{
 			Interval: retry.IntervalSleep(100 * time.Millisecond),
 			Budget:   budget,
 			Attempts: 10,
 		}
-		// Pretend we've had several attempts
-		budget.Attempt(time.Now(), 20)
 
-		// operation will fail 5 times
-		failures = 5
-
-		// Should retry 6 times, 5 failures, and one attempt, never exceeding the budget
-		err := retry.Do(ctx, policy, operation)
-
+		var successCount, failureCount, lastAttempt int
+		// Should retry 6 times, 5 failures, and one attempt, never exceeding the Budget
+		err := retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+			lastAttempt = attempt
+			if attempt <= 5 {
+				failureCount++
+				return errors.New("simulated failure")
+			}
+			successCount++
+			return nil
+		})
 		assert.NoError(t, err)
 		assert.Equal(t, 5, failureCount)
 		assert.Equal(t, 1, successCount)
@@ -167,34 +120,35 @@ func TestBudgetWithDo(t *testing.T) {
 	})
 
 	t.Run("OverBudget", func(t *testing.T) {
-		budget := retry.NewBudget(0.5, time.Minute) // Set a very low ratio to trigger budget exceeded
+		budget := retry.NewSimpleBudget(50, time.Second) // Set a very low ratio to trigger Budget exceeded
 		policy := retry.Policy{
-			Interval: retry.IntervalSleep(10 * time.Millisecond),
+			Interval: retry.IntervalSleep(5 * time.Millisecond),
 			Budget:   budget,
-			Attempts: 30, // Increase attempts to allow budget to be exceeded
+			Attempts: 60, // Increase attempts to allow Budget to be exceeded
 		}
 
-		// TODO: Either include buckets with zero in them in the rate calculation
-		//  or give up on budgets for now. The issue is the rate will make sudden drops
-		//  if {5} then rate is 5.00 if {5, 1} then rate is 4 something, which might be
-		//  under budget... which is confusing.
-		//  What about {5, 0, 0, 0, 10} etc....
-		//
+		var err error
+		var successCount, failureCount int
+		for i := 0; i < 10; i++ {
+			err = retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+				successCount++
+				return nil
+			})
+			require.NoError(t, err)
+		}
+		assert.Equal(t, 10, successCount)
 
-		// operation will fail 9 times
-		failures = 9
-
-		budget.Attempt(time.Now(), 10)
-
-		failureCount = 0
-		successCount = 0
-		lastAttempt = 0
-
-		err := retry.Do(ctx, policy, operation)
-		assert.NoError(t, err)
-		assert.Equal(t, 9, failureCount)
-		assert.Equal(t, 1, successCount)
-		assert.Equal(t, 10, lastAttempt)
+		err = retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+			if attempt <= 51 {
+				failureCount++
+				return errors.New("simulated failure")
+			}
+			successCount++
+			return nil
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 51, failureCount)
+		assert.Equal(t, 11, successCount)
 	})
 }
 
@@ -205,7 +159,7 @@ type Point struct {
 }
 
 func TestBudgetGraph(t *testing.T) {
-	//t.Skip("used for graphing budgets vs backoff recovery time")
+	t.Skip("used for graphing budgets vs backoff recovery time")
 	client := http.Client{
 		Transport: &http.Transport{
 			ForceAttemptHTTP2:     true,
@@ -235,7 +189,7 @@ func TestBudgetGraph(t *testing.T) {
 			Factor: 1.01,
 			Jitter: 0.50,
 		},
-		Budget:   retry.NewBudget(10.0, time.Minute),
+		Budget:   retry.NewSimpleBudget(50, time.Second),
 		Attempts: 0,
 	}, client, "with-budget")
 }
@@ -378,7 +332,7 @@ func writeRollup(t *testing.T, rollup []Point, now time.Time, name string) {
 		panic(err)
 	}
 	w := csv.NewWriter(f)
-	_ = w.Write([]string{"time", "attempt", "failed"})
+	_ = w.Write([]string{"time", "success", "failed"})
 
 	for _, point := range rollup {
 		ts := point.Time.Sub(now).Seconds()
