@@ -176,8 +176,7 @@ var PolicyDefault = Policy{
 	Attempts: 0, // Infinite retries
 }
 
-// Until retries the provided operation using exponential backoff and the default Budget until the
-// context is cancelled
+// Until retries the provided operation using exponential backoff until the context is cancelled
 func Until(ctx context.Context, op func(context.Context, int) error) error {
 	return On(ctx, PolicyDefault, op)
 }

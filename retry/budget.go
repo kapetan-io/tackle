@@ -18,7 +18,7 @@ type Budget interface {
 	Success(now time.Time, hits int)
 }
 
-type SimpleBudget struct {
+type BudgetSimple struct {
 	mutex    sync.Mutex
 	interval time.Duration
 	last     time.Time
@@ -27,7 +27,7 @@ type SimpleBudget struct {
 }
 
 // NewSimpleBudget creates a new Budget with the specified target failure rate.
-// The returned SimpleBudget is thread-safe and can be used as a global Budget
+// The returned Budget is thread-safe and can be used as a global Budget
 // for limiting the total number of retries to a resource from an application,
 // regardless of concurrent threads accessing the resource.
 //
@@ -48,11 +48,9 @@ type SimpleBudget struct {
 // | IsOver() returns False | IsOver() returns True | IsOver() returns False |
 //
 // Since there were 51 failures during the 12:01:02 interval, IsOver() returns true.
-// Once the 12:01:03 interval starts the failure count is reset. IsOver() returns false
-// once two conditions are met. 1. The interval has elapsed 2. The number of Attempts()
-// increases
+// Once the 12:01:03 interval starts the failure count is reset and IsOver() returns false.
 func NewSimpleBudget(limit int, interval time.Duration) Budget {
-	return &SimpleBudget{
+	return &BudgetSimple{
 		limit:    limit,
 		interval: interval,
 	}
@@ -60,7 +58,7 @@ func NewSimpleBudget(limit int, interval time.Duration) Budget {
 
 // Failure records a number of failures for the given time.
 // This method is thread-safe.
-func (b *SimpleBudget) Failure(now time.Time, hits int) {
+func (b *BudgetSimple) Failure(now time.Time, hits int) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -74,7 +72,7 @@ func (b *SimpleBudget) Failure(now time.Time, hits int) {
 
 // Attempt records a number of attempts for the given time.
 // This method is thread-safe.
-func (b *SimpleBudget) Attempt(now time.Time, hits int) {
+func (b *BudgetSimple) Attempt(now time.Time, hits int) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -84,13 +82,13 @@ func (b *SimpleBudget) Attempt(now time.Time, hits int) {
 
 // Success records a number of successful attempts for the given time.
 // This method is thread-safe.
-func (b *SimpleBudget) Success(now time.Time, hits int) {
+func (b *BudgetSimple) Success(now time.Time, hits int) {
 	b.Attempt(now, hits)
 }
 
 // IsOver determines if the current failure rate is over the Budget.
 // This method is thread-safe.
-func (b *SimpleBudget) IsOver(now time.Time) bool {
+func (b *BudgetSimple) IsOver(now time.Time) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -100,7 +98,7 @@ func (b *SimpleBudget) IsOver(now time.Time) bool {
 	return b.failures > b.limit
 }
 
-func (b *SimpleBudget) shiftWindow(now time.Time) {
+func (b *BudgetSimple) shiftWindow(now time.Time) {
 	// Ignore if the current time if before our last shift
 	if now.After(b.last) {
 		b.failures = 0
