@@ -230,8 +230,7 @@ func Do(ctx context.Context, p Policy, op func(context.Context, int) error) erro
 
 			// If op function indicates we should cancel the retry
 			if errors.Is(err, ErrCancelRetry) {
-				// TODO: Test this case
-				return ErrCancelRetry
+				return err
 			}
 
 			// If we have exceeded our attempt count

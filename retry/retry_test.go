@@ -17,6 +17,7 @@ package retry_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/kapetan-io/tackle/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,7 +120,7 @@ func TestRetry(t *testing.T) {
 		require.Equal(t, 5, count)
 	})
 
-	t.Run("CustomPolicy", func(t *testing.T) {
+	t.Run("ContextCancel", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		customPolicy := retry.Policy{
 			// No Backoff, just sleep in-between retries
@@ -146,6 +147,28 @@ func TestRetry(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		cancel()
 		wg.Wait()
+	})
+
+	t.Run("ErrCancelRetry", func(t *testing.T) {
+		customPolicy := retry.Policy{
+			// No Backoff, just sleep in-between retries
+			Interval: retry.IntervalSleep(100 * time.Millisecond),
+			// Attempts of 0 indicate infinite retries
+			Attempts: 0,
+		}
+
+		var retries int
+		err := retry.Do(ctx, customPolicy, func(ctx context.Context, attempt int) error {
+			if attempt < 5 {
+				retries++
+				return errors.New("simulate error")
+			}
+			return fmt.Errorf("manual cancel retry: %w", retry.ErrCancelRetry)
+		})
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, retry.ErrCancelRetry))
+		assert.Equal(t, 4, retries)
+		assert.Equal(t, "manual cancel retry: retry cancelled by request", err.Error())
 	})
 }
 

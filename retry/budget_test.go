@@ -120,7 +120,8 @@ func TestBudgetWithDo(t *testing.T) {
 	})
 
 	t.Run("OverBudget", func(t *testing.T) {
-		budget := retry.NewSimpleBudget(50, time.Second) // Set a very low ratio to trigger Budget exceeded
+		// Set a very low ratio to trigger Budget exceeded
+		budget := NewCountingBudget(retry.NewSimpleBudget(50, time.Second))
 		policy := retry.Policy{
 			Interval: retry.IntervalSleep(5 * time.Millisecond),
 			Budget:   budget,
@@ -149,6 +150,7 @@ func TestBudgetWithDo(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 51, failureCount)
 		assert.Equal(t, 11, successCount)
+		assert.True(t, budget.Count() != 0)
 	})
 }
 
@@ -395,4 +397,49 @@ func roundUp(now time.Time, interval time.Duration) time.Time {
 		r = r.Add(interval)
 	}
 	return r
+}
+
+// CountingBudget wraps a Budget and counts the number of times IsOver() returns true
+type CountingBudget struct {
+	budget retry.Budget
+	mutex  sync.Mutex
+	count  int
+}
+
+// NewCountingBudget creates a new CountingBudget wrapping the provided Budget
+func NewCountingBudget(b retry.Budget) *CountingBudget {
+	return &CountingBudget{budget: b}
+}
+
+// IsOver calls the wrapped Budget's IsOver method and increments the count if it returns true
+func (cb *CountingBudget) IsOver(now time.Time) bool {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	isOver := cb.budget.IsOver(now)
+	if isOver {
+		cb.count++
+	}
+	return isOver
+}
+
+// Failure calls the wrapped Budget's Failure method
+func (cb *CountingBudget) Failure(now time.Time, hits int) {
+	cb.budget.Failure(now, hits)
+}
+
+// Attempt calls the wrapped Budget's Attempt method
+func (cb *CountingBudget) Attempt(now time.Time, hits int) {
+	cb.budget.Attempt(now, hits)
+}
+
+// Success calls the wrapped Budget's Success method
+func (cb *CountingBudget) Success(now time.Time, hits int) {
+	cb.budget.Success(now, hits)
+}
+
+// Count returns the number of times IsOver() has returned true
+func (cb *CountingBudget) Count() int {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+	return cb.count
 }
