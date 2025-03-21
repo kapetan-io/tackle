@@ -107,7 +107,7 @@ func TestRetry(t *testing.T) {
 		count = 0
 
 		// Users can define a custom retry policy to suit their needs
-		err := retry.Do(ctx, customPolicy, func(ctx context.Context, attempt int) error {
+		err := retry.On(ctx, customPolicy, func(ctx context.Context, attempt int) error {
 			err := c.DoThing(ctx, &DoThingRequest{}, &resp)
 			if err != nil {
 				count++
@@ -136,7 +136,7 @@ func TestRetry(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
-			err := retry.Do(ctx, customPolicy, func(ctx context.Context, attempt int) error {
+			err := retry.On(ctx, customPolicy, func(ctx context.Context, attempt int) error {
 				return c.DoThing(ctx, &DoThingRequest{}, &resp)
 			})
 			require.Error(t, err)
@@ -158,7 +158,7 @@ func TestRetry(t *testing.T) {
 		}
 
 		var retries int
-		err := retry.Do(ctx, customPolicy, func(ctx context.Context, attempt int) error {
+		err := retry.On(ctx, customPolicy, func(ctx context.Context, attempt int) error {
 			if attempt < 5 {
 				retries++
 				return errors.New("simulate error")

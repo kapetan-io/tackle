@@ -20,6 +20,7 @@ any golang developer may find useful, without a needing a dependency review.
 - [Color](#color) - Add colorized output to slog messages
 - [AutoTLS](#autotls) - Generate TLS certificates automatically
 - [Wait](#wait) - Simple go routine management with fan out and go routine cancellation
+- [Retry](#retry) - Retry with exponential backoff and retry budgets
 
 ## SET config values
 Simplify setting default values during configuration.

@@ -179,13 +179,13 @@ var PolicyDefault = Policy{
 // Until retries the provided operation using exponential backoff and the default Budget until the
 // context is cancelled
 func Until(ctx context.Context, op func(context.Context, int) error) error {
-	return Do(ctx, PolicyDefault, op)
+	return On(ctx, PolicyDefault, op)
 }
 
 // UntilAttempts retries the provided operation using exponential backoff and the default Budget until the
 // number of attempts has been reached or context is cancelled
 func UntilAttempts(ctx context.Context, attempts int, sleep time.Duration, op func(context.Context, int) error) error {
-	return Do(ctx, Policy{
+	return On(ctx, Policy{
 		Interval: IntervalBackOff{
 			Rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
 			Max:    sleep * 10,
@@ -198,8 +198,8 @@ func UntilAttempts(ctx context.Context, attempts int, sleep time.Duration, op fu
 	}, op)
 }
 
-// Do execute the provided function, retrying using the provided policy.
-func Do(ctx context.Context, p Policy, op func(context.Context, int) error) error {
+// On executes the provided function, retrying using the provided policy.
+func On(ctx context.Context, p Policy, op func(context.Context, int) error) error {
 	attempt := 1
 	if p.Interval == nil {
 		p.Interval = IntervalSleep(time.Second)

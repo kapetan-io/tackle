@@ -104,7 +104,7 @@ func TestBudgetWithDo(t *testing.T) {
 
 		var successCount, failureCount, lastAttempt int
 		// Should retry 6 times, 5 failures, and one attempt, never exceeding the Budget
-		err := retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+		err := retry.On(ctx, policy, func(ctx context.Context, attempt int) error {
 			lastAttempt = attempt
 			if attempt <= 5 {
 				failureCount++
@@ -131,7 +131,7 @@ func TestBudgetWithDo(t *testing.T) {
 		var err error
 		var successCount, failureCount int
 		for i := 0; i < 10; i++ {
-			err = retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+			err = retry.On(ctx, policy, func(ctx context.Context, attempt int) error {
 				successCount++
 				return nil
 			})
@@ -139,7 +139,7 @@ func TestBudgetWithDo(t *testing.T) {
 		}
 		assert.Equal(t, 10, successCount)
 
-		err = retry.Do(ctx, policy, func(ctx context.Context, attempt int) error {
+		err = retry.On(ctx, policy, func(ctx context.Context, attempt int) error {
 			if attempt <= 51 {
 				failureCount++
 				return errors.New("simulated failure")
@@ -245,7 +245,7 @@ func report(t *testing.T, policy retry.Policy, client http.Client, prefix string
 			defer wg.Done()
 
 			for {
-				_ = retry.Do(ctx, policy, func(ctx context.Context, i int) error {
+				_ = retry.On(ctx, policy, func(ctx context.Context, i int) error {
 					return request(&client, server.URL)
 				})
 				// Wait to be cancelled or for our next request. This simulates
