@@ -377,6 +377,9 @@ if err != nil {
 ```
 
 ## Retry
+Read why implementing a quality retry strategy is important:
+[Good retry, Bad Retry](https://medium.com/yandex/good-retry-bad-retry-an-incident-story-648072d3cee6)
+
 <h2 align="center">
 <img src="docs/retry-budget-graph.png" alt="Retry Budget Graph" width="800" />
 </h2>
@@ -384,14 +387,15 @@ if err != nil {
 - RED line indicates the number of retries
 - GREEN line indicates the availability of the resource
 - BLUE line indicates successful access of the resource.
- 
+
 You can see how exponential backoff retry results in a high occurrence of retries during the beginning of the outage
-while an exponential backoff WITH a budget limits it's impact on the resource during outage. However, recovery time 
-is quicker with simple exponential back off than with budget, as the budget window must expire before requests are
-allowed again.
+while an exponential backoff WITH a simple budget limits it's impact on the resource during outage. However, 
+recovery time is quicker with simple exponential back off than with simple budget, as the budget window must expire 
+before requests are allowed again. This test preformed with `retry.NewSimpleBudget()` and `retry.PolicyDefault`
+exponential back off configuration -- the same one used by Google's Java Client.
 
 #### Usage
-The retry package is a collection of functions and structs which allow the creation of custom retry exponential back 
+The retry package is a collection of functions and structs which allow the creation of custom retry exponential back
 off policies and retry budgets within your application. It also includes common test helpers useful for implementing
 functional tests. Retries are cancelable via `context.Context` and by returning `retry.ErrCancelRetry` from the call
 back function.
@@ -401,16 +405,17 @@ import "github.com/kapetan-io/tackle/retry"
 ctx, cancel := context.WithCancel(context.Background())
 var resp DoThingResponse
 
-// If DoThing() returns an error, this operation is retried using the retry.PolicyDefault which is an 
-// exponential backoff. Retries continue until the context is cancelled
+// If DoThing() returns an error, this operation is retried using the retry.PolicyDefault
+// which is an exponential backoff. Retries continue until the context is cancelled
 err := retry.Until(ctx, func(ctx context.Context, attempt int) error {
     return DoThing(ctx, &DoThingRequest{}, &resp)
 })
 
-// If DoThing() returns an error, this operation is retried until the number of attempts has expired 
-// and sleeps between retries starting with the provided sleep time (5 seconds) and increments sleep time
-// using the default exponential back off interval `retry.IntervalBackOff`
-err = retry.UntilAttempts(ctx, 10, 5*time.Second, func(ctx context.Context, attempt int) error {
+// If DoThing() returns an error, this operation is retried until the number of attempts 
+// has expired and sleeps between retries starting with the provided sleep time (5 seconds)
+// and increments sleep time using the default exponential back off interval 
+// `retry.IntervalBackOff`
+err = retry.UntilAttempts(ctx, 10, time.Second, func(ctx context.Context, _ int) error {
     return DoThing(ctx, &DoThingRequest{}, &resp)
 })
 
@@ -493,7 +498,8 @@ func TestTellJoke(t *testing.T) {
         }
     })
 
-    // If UntilPass() returns true, we know the test eventually passed and our test can continue.
+    // If UntilPass() returns true, we know the test eventually passed
+    //and our test can continue.
     require.True(t, pass)
 }
 ```
@@ -579,7 +585,7 @@ Retry
 - `retry.Interval` - The interval interface
 - `retry.IntervalSleep` - An interval implementation that sleeps a constant duration each interval
 - `retry.IntervalBackOff` - An exponential backoff interval implementation
-- `retry.IntervalBackOff.Explain()` - Explains how the sleep duration was calculated for the provided attempt
+- `retry.IntervalBackOff.Explain()` - Explains how the sleep duration was calculated
 - `retry.IntervalBackOff.ExplainString()` - Identical to Explain() but returned as a string
 - `retry.Policy` - The policy struct used by `On()`, `Until()` and `UntilAttempts()`
 - `retry.PolicyDefault` - The default exponential backoff policy
@@ -594,13 +600,13 @@ Budgets
 - `retry.NewSimpleBudget()` - Creates a simple single time window based budget
 
 Rates
-- `retry.NewRate` - Intended to be used to build complex Budgets like sliding window or rate limit based Budgets
+- `retry.NewRate` - Used to build complex Budgets like sliding window or rate limit based Budgets
 
 ## Mailgun History
 Several of the packages here are modified versions of libraries used successfully during my time at
 [Mailgun](https://github.com/mailgun). Some of the original packages can be found
-[here](https://github.com/mailgun/holster). 
+[here](https://github.com/mailgun/holster).
 
 Tackle differs from Holster in one specific way, unlike Holster which became a dumping ground for often used
 libraries and useful tools internal to Mailgun. Tackle is strictly for packages with no external dependencies other
-than the golang standard library. 
+than the golang standard library.
