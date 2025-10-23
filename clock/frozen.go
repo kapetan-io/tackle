@@ -173,7 +173,11 @@ func (t *frozenTimer) Stop() bool {
 
 func (t *frozenTimer) Reset(d time.Duration) bool {
 	active := t.ft.stopTimer(t)
-	t.when = t.ft.Now().Add(d)
+
+	t.ft.mu.Lock()
+	t.when = t.ft.now.Add(d)
+	t.ft.mu.Unlock()
+
 	t.ft.startTimer(t)
 	return active
 }
