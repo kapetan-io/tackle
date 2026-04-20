@@ -22,7 +22,7 @@ func TestUntilConnect(t *testing.T) {
 	go func() {
 		cn, err := ln.Accept()
 		require.NoError(t, err)
-		cn.Close()
+		_ = cn.Close()
 	}()
 	// Wait until we can connect, then continue with the test
 	retry.UntilConnect(t, 10, time.Millisecond*100, ln.Addr().String())
@@ -39,7 +39,7 @@ func TestUntilPass(t *testing.T) {
 			// Set the value
 			value = r.FormValue("value")
 		} else {
-			fmt.Fprintln(w, value)
+			_, _ = fmt.Fprintln(w, value)
 		}
 	}))
 	defer ts.Close()
