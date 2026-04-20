@@ -27,6 +27,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net"
 	"os"
@@ -87,7 +88,9 @@ type Config struct {
 	// presented by the server and any host name in that certificate.
 	InsecureSkipVerify bool
 
-	// (Optional) A Logger which implements the declared logger interface (typically *logrus.Entry)
+	// (Optional) A logger used to emit diagnostic messages. Defaults to a logger
+	// backed by slog.DiscardHandler (silent) when left nil. Any *slog.Logger can
+	// be assigned here directly — it satisfies StandardLogger structurally.
 	Logger StandardLogger
 
 	// (Optional) The CA Certificate in PEM format. Used if CaFile is unset
@@ -223,7 +226,7 @@ func Setup(conf *Config) error {
 		return err
 	}
 
-	set.Default(&conf.Logger, &NoOpLogger{})
+	set.Default(&conf.Logger, slog.New(slog.DiscardHandler))
 
 	// If generated TLS certs requested
 	if conf.AutoTLS {

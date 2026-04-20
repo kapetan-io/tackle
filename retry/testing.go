@@ -27,7 +27,7 @@ func (s *TestResults) FailNow() {
 
 func (s *TestResults) Report(t TestingT) {
 	for _, failure := range s.Failures {
-		t.Errorf(failure)
+		t.Errorf("%s", failure)
 	}
 }
 
@@ -70,7 +70,7 @@ func UntilConnect(t TestingT, a int, d time.Duration, addr string) {
 		if err != nil {
 			continue
 		}
-		conn.Close()
+		_ = conn.Close()
 		time.Sleep(d)
 		return
 	}

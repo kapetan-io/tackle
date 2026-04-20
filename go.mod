@@ -3,9 +3,9 @@ module github.com/kapetan-io/tackle
 // tackle requires 1.22 or greater. 1.22 fixes closure scope issues with previous golang versions.
 // This is required for proper use of `wait.Group` and `wait.FanOut`.
 // See https://go.dev/blog/loopvar-preview for details
-go 1.23.0
+go 1.26
 
-toolchain go1.23.7
+toolchain go1.26.2
 
 require (
 	github.com/stretchr/testify v1.9.0
