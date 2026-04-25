@@ -205,6 +205,48 @@ func TestIntervalBackOff(t *testing.T) {
 	assert.Equal(t, 60.0, p.Next(12).Seconds())
 }
 
+func TestIntervalBackOffRespectsMax(t *testing.T) {
+	t.Run("no-jitter", func(t *testing.T) {
+		p := retry.IntervalBackOff{
+			Min:    500 * time.Millisecond,
+			Max:    20 * time.Hour,
+			Factor: 2.0,
+		}
+		for attempt := 0; attempt < 30; attempt++ {
+			assert.LessOrEqual(t, p.Next(attempt), p.Max)
+		}
+	})
+
+	t.Run("with-jitter", func(t *testing.T) {
+		p := retry.IntervalBackOff{
+			Rand:   rand.New(rand.NewSource(0)),
+			Min:    500 * time.Millisecond,
+			Max:    20 * time.Hour,
+			Factor: 2.0,
+			Jitter: 0.5,
+		}
+		for attempt := 0; attempt < 30; attempt++ {
+			assert.LessOrEqual(t, p.Next(attempt), p.Max)
+		}
+	})
+
+	t.Run("explain", func(t *testing.T) {
+		p := retry.IntervalBackOff{
+			Rand:   rand.New(rand.NewSource(0)),
+			Min:    500 * time.Millisecond,
+			Max:    20 * time.Hour,
+			Factor: 2.0,
+			Jitter: 0.5,
+		}
+		for attempt := 0; attempt < 30; attempt++ {
+			e := p.Explain(attempt)
+			assert.LessOrEqual(t, e.BackOff, p.Max)
+			assert.LessOrEqual(t, e.WithJitter, p.Max)
+			assert.LessOrEqual(t, e.RangeMin, p.Max)
+		}
+	})
+}
+
 func TestIntervalBackOffWithJitter(t *testing.T) {
 	p := retry.IntervalBackOff{
 		Rand:   rand.New(rand.NewSource(0)),
