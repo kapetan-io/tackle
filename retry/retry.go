@@ -64,6 +64,9 @@ type IntervalBackOff struct {
 
 func (b IntervalBackOff) Next(attempts int) time.Duration {
 	d := time.Duration(float64(b.Min) * math.Pow(b.Factor, float64(attempts)))
+	if d > b.Max {
+		d = b.Max
+	}
 	if b.Rand != nil {
 		upper := float64(d) + (float64(d) * b.Jitter)
 		lower := float64(d) - (float64(d) * b.Jitter)
@@ -100,8 +103,11 @@ type BackOffExplain struct {
 func (b IntervalBackOff) Explain(attempt int) BackOffExplain {
 	// Calc the power of the factor based on attempts
 	e := BackOffExplain{Attempt: attempt, PowerOf: math.Pow(b.Factor, float64(attempt))}
-	// Backoff is the minimum multiplied by the power
+	// Backoff is the minimum multiplied by the power, capped at Max
 	e.BackOff = time.Duration(float64(b.Min) * e.PowerOf)
+	if e.BackOff > b.Max {
+		e.BackOff = b.Max
+	}
 
 	// If we asked for jitter
 	if b.Rand != nil {
@@ -109,6 +115,12 @@ func (b IntervalBackOff) Explain(attempt int) BackOffExplain {
 		e.RangeMin = time.Duration(float64(e.BackOff) - percent)
 		e.RangeMax = time.Duration(float64(e.BackOff) + percent)
 		e.WithJitter = time.Duration(float64(e.RangeMin) + b.Rand.Float64()*float64(e.RangeMax-e.RangeMin))
+		if e.WithJitter > b.Max {
+			e.WithJitter = b.Max
+		}
+		if e.WithJitter < b.Min {
+			e.WithJitter = b.Min
+		}
 	}
 	return e
 }
